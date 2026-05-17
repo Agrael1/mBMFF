@@ -205,6 +205,11 @@ public:
     // TODO: item iterator
 };
 
+struct ispe_header {
+    std::uint32_t image_width = 0;
+    std::uint32_t image_height = 0;
+};
+
 //------------------------------------------------------------------------------------------------------------
 
 using any_box_view = struct box_view_base;
@@ -266,6 +271,7 @@ template <>
 struct basic_box_view<box_type::iinf> : public box_view_base {
     constexpr static properties properties = properties::container | properties::full_box;
     constexpr static auto parse(any_box_view box) noexcept -> std::expected<any_box_view, unexpected>;
+    constexpr auto entry_count() const noexcept -> std::uint32_t;
 };
 
 template <>
@@ -302,6 +308,12 @@ struct basic_box_view<box_type::iprp> : public box_view_base {
 template <>
 struct basic_box_view<box_type::ipco> : public box_view_base {
     constexpr static properties properties = properties::container;
+};
+
+template <>
+struct basic_box_view<box_type::ispe> : public box_view_base {
+    constexpr static properties properties = properties::full_box;
+    constexpr auto header() const noexcept -> ispe_header;
 };
 
 //------------------------------------------------------------------------------------------------------------
@@ -504,6 +516,19 @@ inline constexpr auto basic_box_view<box_type::iinf>::parse(any_box_view box) no
     }
     return box;
 }
+
+inline constexpr auto basic_box_view<box_type::iinf>::entry_count() const noexcept -> std::uint32_t
+{
+    std::size_t reserved_size = (version() == 0) ? 2 : 4;
+    const std::byte* reserved_end = payload.data() - reserved_size;
+    std::span<const std::byte> reserved_span(reserved_end, reserved_size);
+
+    if (version() == 0) {
+        return read_be<std::uint16_t>(reserved_span);
+    }
+    return read_be<std::uint32_t>(reserved_span);
+}
+
 //------------------------------------------------------------------------------------------------------------
 // INFE
 inline constexpr auto basic_box_view<box_type::infe>::item_id() const noexcept -> std::uint32_t
@@ -573,6 +598,7 @@ inline constexpr auto basic_box_view<box_type::infe>::header() const noexcept ->
 constexpr auto basic_box_view<box_type::hdlr>::header() const noexcept -> hdlr_header
 {
     hdlr_header result{};
+    // Skip archaic pre-ISOBMFF reserved fields (4 bytes) "mhlr" or "alis"
     uint32_t reserved = read_be<uint32_t>(payload);
 
     // Handler type is at offset 4
@@ -617,6 +643,16 @@ constexpr auto basic_box_view<box_type::iloc>::header() const noexcept -> iloc_h
         result.item_count = read_be<uint32_t>(xpayload);
         result.item_data = xpayload.subspan(4);
     }
+    return result;
+}
+
+//------------------------------------------------------------------------------------------------------------
+// ISPE
+constexpr auto basic_box_view<box_type::ispe>::header() const noexcept -> ispe_header
+{
+    ispe_header result{};
+    result.image_width = read_be<uint32_t>(payload);
+    result.image_height = read_be<uint32_t>(payload.subspan(4));
     return result;
 }
 
@@ -815,7 +851,7 @@ struct std::formatter<mbmff::iinf_box> : std::formatter<std::string_view> {
     auto format(const mbmff::iinf_box& box, std::format_context& ctx) const
     {
         return std::formatter<std::string_view>::format(
-            std::format("IINF: version={} flags=0x{:06X}", box.header.version, box.header.flags_value()),
+            std::format("IINF: version={} flags=0x{:06X}, entries={}", box.header.version, box.header.flags_value(), box.entry_count()),
             ctx
         );
     }
@@ -909,5 +945,17 @@ struct std::formatter<mbmff::ipco_box> : std::formatter<std::string_view> {
     auto format(const mbmff::ipco_box& box, std::format_context& ctx) const
     {
         return std::formatter<std::string_view>::format("IPCO: Container", ctx);
+    }
+};
+
+template <>
+struct std::formatter<mbmff::ispe_box> : std::formatter<std::string_view> {
+    auto format(const mbmff::ispe_box& box, std::format_context& ctx) const
+    {
+        auto header = box.header();
+        return std::formatter<std::string_view>::format(
+            std::format("ISPE: image_width={} image_height={}", header.image_width, header.image_height),
+            ctx
+        );
     }
 };

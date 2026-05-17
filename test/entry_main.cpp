@@ -63,6 +63,10 @@ int main()
             auto mdat = mbmff::box_cast<mbmff::box_type::mdat>(box);
             std::cout << std::format("{}\n", mdat);
         } break;
+        case mbmff::box_type::ispe: {
+            auto ispe = mbmff::box_cast<mbmff::box_type::ispe>(box);
+            std::cout << std::format("{}\n", ispe);
+        } break;
         default:
             std::cout << "Box type: " << box.header.type_string().view()
                       << ", size: " << box.header.size << '\n';
