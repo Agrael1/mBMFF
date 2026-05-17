@@ -210,6 +210,37 @@ struct ispe_header {
     std::uint32_t image_height = 0;
 };
 
+struct av1C_header {
+    // Byte 0
+    std::uint8_t marker  : 1 = 0; // should be 1
+    std::uint8_t version : 7 = 0; // should be 1
+
+    // Byte 1
+    std::uint8_t seq_profile     : 3 = 0;
+    std::uint8_t seq_level_idx_0 : 5 = 0;
+
+    // Byte 2
+    std::uint8_t seq_tier_0             : 1 = 0;
+    std::uint8_t high_bitdepth          : 1 = 0;
+    std::uint8_t twelve_bit             : 1 = 0;
+    std::uint8_t monochrome             : 1 = 0;
+    std::uint8_t chroma_subsampling_x   : 1 = 0;
+    std::uint8_t chroma_subsampling_y   : 1 = 0;
+    std::uint8_t chroma_sample_position : 2 = 0;
+
+    // Byte 3
+    std::uint8_t reserved : 3 = 0; // should be 0
+    std::uint8_t initial_presentation_delay_present : 1 = 0;
+    std::uint8_t initial_presentation_delay_minus_one : 4 = 0;
+
+    // followed by config OBUs
+    std::span<const std::byte> config_obus{};
+
+public:
+
+    // TODO: parse config OBUs
+};
+
 //------------------------------------------------------------------------------------------------------------
 
 using any_box_view = struct box_view_base;
@@ -314,6 +345,12 @@ template <>
 struct basic_box_view<box_type::ispe> : public box_view_base {
     constexpr static properties properties = properties::full_box;
     constexpr auto header() const noexcept -> ispe_header;
+};
+
+template <>
+struct basic_box_view<box_type::av1C> : public box_view_base {
+    constexpr static properties properties = properties::none;
+    constexpr auto header() const noexcept -> av1C_header;
 };
 
 //------------------------------------------------------------------------------------------------------------
@@ -657,6 +694,47 @@ constexpr auto basic_box_view<box_type::ispe>::header() const noexcept -> ispe_h
 }
 
 //------------------------------------------------------------------------------------------------------------
+// AV1C
+constexpr auto basic_box_view<box_type::av1C>::header() const noexcept -> av1C_header
+{
+    av1C_header result{};
+    if (payload.size() < 3) {
+        return result;
+    }
+
+    // Byte 0
+    std::uint8_t read_byte = static_cast<uint8_t>(payload[0]);
+    result.marker = (read_byte >> 7) & 0x01;
+    result.version = read_byte & 0x7F;
+
+    // Byte 1
+    read_byte = static_cast<uint8_t>(payload[1]);
+    result.seq_profile = (read_byte >> 5) & 0x07;
+    result.seq_level_idx_0 = read_byte & 0x1F;
+
+    // Byte 2
+    read_byte = static_cast<uint8_t>(payload[2]);
+    result.seq_tier_0 = (read_byte >> 7) & 0x01;
+    result.high_bitdepth = (read_byte >> 6) & 0x01;
+    result.twelve_bit = (read_byte >> 5) & 0x01;
+    result.monochrome = (read_byte >> 4) & 0x01;
+    result.chroma_subsampling_x = (read_byte >> 3) & 0x01;
+    result.chroma_subsampling_y = (read_byte >> 2) & 0x01;
+    result.chroma_sample_position = read_byte & 0x03;
+
+    // Byte 3
+    read_byte = static_cast<uint8_t>(payload[3]);
+    result.reserved = (read_byte >> 5) & 0x07;
+    result.initial_presentation_delay_present = (read_byte >> 4) & 0x01;
+    if (result.initial_presentation_delay_present) {
+        result.initial_presentation_delay_minus_one = read_byte & 0x0F;
+    }
+
+    result.config_obus = payload.subspan(4);
+    return result;
+}
+
+//------------------------------------------------------------------------------------------------------------
 template <box_type Box>
 constexpr auto box_cast(const any_box_view& box) noexcept -> basic_box_view<Box>
 {
@@ -851,7 +929,12 @@ struct std::formatter<mbmff::iinf_box> : std::formatter<std::string_view> {
     auto format(const mbmff::iinf_box& box, std::format_context& ctx) const
     {
         return std::formatter<std::string_view>::format(
-            std::format("IINF: version={} flags=0x{:06X}, entries={}", box.header.version, box.header.flags_value(), box.entry_count()),
+            std::format(
+                "IINF: version={} flags=0x{:06X}, entries={}",
+                box.header.version,
+                box.header.flags_value(),
+                box.entry_count()
+            ),
             ctx
         );
     }
@@ -933,10 +1016,7 @@ template <>
 struct std::formatter<mbmff::iprp_box> : std::formatter<std::string_view> {
     auto format(const mbmff::iprp_box& box, std::format_context& ctx) const
     {
-        return std::formatter<std::string_view>::format(
-            "IPRP: Container",
-            ctx
-        );
+        return std::formatter<std::string_view>::format("IPRP: Container", ctx);
     }
 };
 
@@ -957,5 +1037,24 @@ struct std::formatter<mbmff::ispe_box> : std::formatter<std::string_view> {
             std::format("ISPE: image_width={} image_height={}", header.image_width, header.image_height),
             ctx
         );
+    }
+};
+
+template <>
+struct std::formatter<mbmff::av1C_box> : std::formatter<std::string_view> {
+    auto format(const mbmff::av1C_box& box, std::format_context& ctx) const
+    {
+        auto header = box.header();
+        std::string output = std::format(
+            "av1C: profile={} level={} tier={} bitdepth={} monochrome={} chroma_subsampling=({}, {})",
+            std::uint8_t(header.seq_profile),
+            std::uint8_t(header.seq_level_idx_0),
+            header.seq_tier_0 ? "high" : "main",
+            header.high_bitdepth ? (header.twelve_bit ? 12 : 10) : 8,
+            header.monochrome ? "yes" : "no",
+            header.chroma_subsampling_x ? "1" : "0",
+            header.chroma_subsampling_y ? "1" : "0"
+        );
+        return std::formatter<std::string_view>::format(output, ctx);
     }
 };

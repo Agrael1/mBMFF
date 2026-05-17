@@ -67,6 +67,10 @@ int main()
             auto ispe = mbmff::box_cast<mbmff::box_type::ispe>(box);
             std::cout << std::format("{}\n", ispe);
         } break;
+        case mbmff::box_type::av1C: {
+            auto av1C = mbmff::box_cast<mbmff::box_type::av1C>(box);
+            std::cout << std::format("{}\n", av1C);
+        } break;
         default:
             std::cout << "Box type: " << box.header.type_string().view()
                       << ", size: " << box.header.size << '\n';
