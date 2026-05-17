@@ -31,6 +31,11 @@
     MACRO(iref)                        \
     MACRO(iloc)                        \
     MACRO(hdlr)                        \
+    MACRO(pitm)                        \
+    MACRO(ispe)                        \
+    MACRO(av1C)                        \
+    MACRO(pixi)                        \
+    MACRO(ipma)                        \
     MACRO(infe)
 
 namespace mbmff {
@@ -83,6 +88,10 @@ constexpr auto operator&(properties a, properties b) noexcept -> properties
 constexpr auto operator+(properties a) noexcept -> std::underlying_type_t<properties>
 {
     return std::to_underlying(a);
+}
+constexpr auto has(properties a, properties check) noexcept -> bool
+{
+    return (a & check) != properties::none;
 }
 
 //------------------------------------------------------------------------------------------------------------
@@ -159,7 +168,7 @@ public:
 struct infe_header {
     std::uint32_t item_id = 0;
     std::uint16_t item_protection_index = 0;
-    fourcc_string item_type{};
+    mbmff::fourcc_string item_type{};
     std::string_view item_name{};
     std::string_view content_type{};
     std::string_view content_encoding{};
@@ -167,9 +176,33 @@ struct infe_header {
 };
 
 struct ftyp_header {
-    fourcc_string major_brand{};
+    mbmff::fourcc_string major_brand{};
     std::uint32_t minor_version = 0;
-    std::span<const fourcc_string> compatible_brands{};
+    std::span<const mbmff::fourcc_string> compatible_brands{};
+};
+
+struct hdlr_header {
+    mbmff::fourcc_string handler_type{};
+    std::string_view name{};
+};
+
+struct iloc_item {
+    std::uint32_t item_id = 0;
+    std::uint8_t construction_method = 0;
+    std::uint64_t base_offset = 0;
+    std::uint32_t extent_count = 0;
+};
+
+struct iloc_header {
+    std::uint8_t offset_size = 0;
+    std::uint8_t length_size = 0;
+    std::uint8_t base_offset_size = 0;
+    std::uint8_t index_size = 0;
+    std::uint32_t item_count = 0;
+    std::span<const std::byte> item_data{};
+
+public:
+    // TODO: item iterator
 };
 
 //------------------------------------------------------------------------------------------------------------
@@ -241,6 +274,34 @@ struct basic_box_view<box_type::infe> : public box_view_base {
     constexpr auto header() const noexcept -> infe_header;
     constexpr auto item_id() const noexcept -> std::uint32_t;
     constexpr auto item_protection_index() const noexcept -> std::uint16_t;
+};
+
+template <>
+struct basic_box_view<box_type::hdlr> : public box_view_base {
+    constexpr static properties properties = properties::full_box;
+    constexpr auto header() const noexcept -> hdlr_header;
+};
+
+template <>
+struct basic_box_view<box_type::pitm> : public box_view_base {
+    constexpr static properties properties = properties::full_box;
+    constexpr auto item_id() const noexcept -> uint32_t;
+};
+
+template <>
+struct basic_box_view<box_type::iloc> : public box_view_base {
+    constexpr static properties properties = properties::full_box;
+    constexpr auto header() const noexcept -> iloc_header;
+};
+
+template <>
+struct basic_box_view<box_type::iprp> : public box_view_base {
+    constexpr static properties properties = properties::container;
+};
+
+template <>
+struct basic_box_view<box_type::ipco> : public box_view_base {
+    constexpr static properties properties = properties::container;
 };
 
 //------------------------------------------------------------------------------------------------------------
@@ -384,10 +445,7 @@ inline constexpr auto basic_box_view<box_type::ftyp>::parse(any_box_view box) no
 }
 constexpr auto basic_box_view<box_type::ftyp>::header() const noexcept -> ftyp_header
 {
-    return ftyp_header{major_brand(),
-        minor_version(),
-        compatible_brands()
-    };
+    return ftyp_header{major_brand(), minor_version(), compatible_brands()};
 }
 constexpr auto basic_box_view<box_type::ftyp>::major_brand() const noexcept -> fourcc_string
 {
@@ -511,6 +569,58 @@ inline constexpr auto basic_box_view<box_type::infe>::header() const noexcept ->
 }
 
 //------------------------------------------------------------------------------------------------------------
+// HDLR
+constexpr auto basic_box_view<box_type::hdlr>::header() const noexcept -> hdlr_header
+{
+    hdlr_header result{};
+    uint32_t reserved = read_be<uint32_t>(payload);
+
+    // Handler type is at offset 4
+    result.handler_type = fourcc_string::from_data(payload.subspan(4));
+
+    // skip another 3x4 bytes of reserved data
+    auto subspan = payload.subspan(16);
+    if (!subspan.empty()) {
+        auto name = read_cstr(subspan, 0);
+        result.name = name.value;
+    }
+    return result;
+}
+
+//------------------------------------------------------------------------------------------------------------
+// PITM
+constexpr auto basic_box_view<box_type::pitm>::item_id() const noexcept -> uint32_t
+{
+    if (version() == 0) {
+        return read_be<uint16_t>(payload);
+    }
+    return read_be<uint32_t>(payload);
+}
+
+//------------------------------------------------------------------------------------------------------------
+// ILOC
+constexpr auto basic_box_view<box_type::iloc>::header() const noexcept -> iloc_header
+{
+    iloc_header result{};
+    uint8_t first_byte = static_cast<uint8_t>(payload[0]);
+    result.offset_size = (first_byte >> 4) & 0x0F;
+    result.length_size = first_byte & 0x0F;
+    uint8_t second_byte = static_cast<uint8_t>(payload[1]);
+    result.base_offset_size = (second_byte >> 4) & 0x0F;
+    result.index_size = second_byte & 0x0F;
+
+    auto xpayload = this->payload.subspan(2);
+    if (version() < 2) {
+        result.item_count = read_be<uint16_t>(xpayload);
+        result.item_data = xpayload.subspan(2);
+    } else {
+        result.item_count = read_be<uint32_t>(xpayload);
+        result.item_data = xpayload.subspan(4);
+    }
+    return result;
+}
+
+//------------------------------------------------------------------------------------------------------------
 template <box_type Box>
 constexpr auto box_cast(const any_box_view& box) noexcept -> basic_box_view<Box>
 {
@@ -521,17 +631,43 @@ constexpr auto box_cast(const any_box_view& box) noexcept -> basic_box_view<Box>
 }
 
 //------------------------------------------------------------------------------------------------------------
+enum class iterator_flags : uint32_t {
+    none = 0,
+    recursive = 1 << 0,
+};
+constexpr auto operator|(iterator_flags a, iterator_flags b) noexcept -> iterator_flags
+{
+    return static_cast<iterator_flags>(std::to_underlying(a) | std::to_underlying(b));
+}
+constexpr auto operator&(iterator_flags a, iterator_flags b) noexcept -> iterator_flags
+{
+    return static_cast<iterator_flags>(std::to_underlying(a) & std::to_underlying(b));
+}
+constexpr auto operator+(iterator_flags a) noexcept -> std::underlying_type_t<iterator_flags>
+{
+    return std::to_underlying(a);
+}
+constexpr auto has(iterator_flags a, iterator_flags check) noexcept -> bool
+{
+    return (a & check) != iterator_flags::none;
+}
+
 struct box_iterator {
     using iterator_category = std::forward_iterator_tag;
     using value_type = std::expected<any_box_view, unexpected>;
     using difference_type = std::ptrdiff_t;
 
     std::span<const std::byte> remaining;
+    iterator_flags flags = iterator_flags::none;
 
 public:
     constexpr box_iterator() noexcept = default;
-    constexpr explicit box_iterator(std::span<const std::byte> data) noexcept
+    constexpr explicit box_iterator(
+        std::span<const std::byte> data,
+        iterator_flags flags = iterator_flags::none
+    ) noexcept
         : remaining(data)
+        , flags(flags)
     {}
 
 public:
@@ -566,16 +702,30 @@ public:
             return *this;
         }
         auto result = parse(remaining);
-        if (result) {
-            std::size_t box_size = (result->header.size == 0) ? remaining.size()
-                                                              : static_cast<std::size_t>(result->header.size);
-            if (box_size == 0 || box_size > remaining.size()) {
-                remaining = {};
-            } else {
-                remaining = remaining.subspan(box_size);
-            }
-        } else {
+        if (!result) {
             remaining = {};
+            return *this;
+        }
+
+        // If recursive flag is set and the box is a container, iterate into it instead of moving to the next sibling
+        if (has(flags, iterator_flags::recursive)) {
+            auto properties = get_box_properties(result->header.type);
+
+            if (has(properties, properties::container)) {
+                auto* current_end = &remaining.back() + 1;
+                auto* payload_start = &result->payload[0];
+
+                remaining = std::span<const std::byte>(payload_start, current_end);
+                return *this;
+            }
+        }
+
+        std::size_t box_size = (result->header.size == 0) ? remaining.size()
+                                                          : static_cast<std::size_t>(result->header.size);
+        if (box_size == 0 || box_size > remaining.size()) {
+            remaining = {};
+        } else {
+            remaining = remaining.subspan(box_size);
         }
         return *this;
     }
@@ -594,12 +744,6 @@ public:
         return remaining.data() == other.remaining.data() && remaining.size() == other.remaining.size();
     }
 };
-
-// TODO: implement
-struct recursive_box_iterator {
-    using iterator_category = std::forward_iterator_tag;
-};
-
 } // namespace mbmff
 
 #undef MBMFF_ITERATE_BOX_TYPES
@@ -707,5 +851,63 @@ struct std::formatter<mbmff::infe_box> : std::formatter<std::string_view> {
         }
 
         return std::formatter<std::string_view>::format(output, ctx);
+    }
+};
+
+template <>
+struct std::formatter<mbmff::hdlr_box> : std::formatter<std::string_view> {
+    auto format(const mbmff::hdlr_box& box, std::format_context& ctx) const
+    {
+        auto header = box.header();
+        std::string output = std::format("HDLR: handler_type={}", header.handler_type.view());
+        if (!header.name.empty()) {
+            output.append(std::format(" name={}", header.name));
+        }
+        return std::formatter<std::string_view>::format(output, ctx);
+    }
+};
+
+template <>
+struct std::formatter<mbmff::pitm_box> : std::formatter<std::string_view> {
+    auto format(const mbmff::pitm_box& box, std::format_context& ctx) const
+    {
+        return std::formatter<std::string_view>::format(std::format("PITM: item_id={}", box.item_id()), ctx);
+    }
+};
+
+template <>
+struct std::formatter<mbmff::iloc_box> : std::formatter<std::string_view> {
+    auto format(const mbmff::iloc_box& box, std::format_context& ctx) const
+    {
+        auto header = box.header();
+        std::string output = std::format(
+            "ILOC: version={} offset_size={} length_size={} base_offset_size={} index_size={} item_count={}",
+            box.version(),
+            header.offset_size,
+            header.length_size,
+            header.base_offset_size,
+            header.index_size,
+            header.item_count
+        );
+        return std::formatter<std::string_view>::format(output, ctx);
+    }
+};
+
+template <>
+struct std::formatter<mbmff::iprp_box> : std::formatter<std::string_view> {
+    auto format(const mbmff::iprp_box& box, std::format_context& ctx) const
+    {
+        return std::formatter<std::string_view>::format(
+            "IPRP: Container",
+            ctx
+        );
+    }
+};
+
+template <>
+struct std::formatter<mbmff::ipco_box> : std::formatter<std::string_view> {
+    auto format(const mbmff::ipco_box& box, std::format_context& ctx) const
+    {
+        return std::formatter<std::string_view>::format("IPCO: Container", ctx);
     }
 };
