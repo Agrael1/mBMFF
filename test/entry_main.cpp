@@ -70,10 +70,24 @@ int main()
         case mbmff::box_type::av1C: {
             auto av1C = mbmff::box_cast<mbmff::box_type::av1C>(box);
             std::cout << std::format("{}\n", av1C);
+
+            // scan OBUs in the av1C payload
+            for (std::uint32_t i = 0; const auto& obu : mbmff::obu_iterator(av1C.header())) {
+                if (!obu) {
+                    std::cout << std::format(
+                        "    OBU parsing error: code={}, needed={}\n",
+                        obu.error().code,
+                        obu.error().needed
+                    );
+                    break;
+                }
+
+                std::cout << std::format("    {}:{}\n", i++, obu.value());
+            }
+
         } break;
         default:
-            std::cout << "Box type: " << box.header.type_string().view()
-                      << ", size: " << box.header.size << '\n';
+            std::cout << "Box type: " << box.header.type_string().view() << ", size: " << box.header.size << '\n';
             break;
         }
     }

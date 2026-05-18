@@ -3,11 +3,10 @@
 #include <bit>
 #include <concepts>
 #include <cstring>
-#include <expected>
 #include <format>
-#include <span>
 #include <string_view>
 #include <type_traits>
+#include "av1.hpp"
 
 #define MBMFF_ITERATE_BOX_TYPES(MACRO) \
     MACRO(ftyp)                        \
@@ -39,26 +38,6 @@
     MACRO(infe)
 
 namespace mbmff {
-enum class error_code {
-    success = 0,
-    invalid_format,
-    need_more_data,
-};
-
-//------------------------------------------------------------------------------------------------------------
-static constexpr auto get_error_message(error_code code) noexcept -> std::string_view
-{
-    switch (code) {
-    case error_code::success:
-        return "Success";
-    case error_code::invalid_format:
-        return "Invalid format";
-    case error_code::need_more_data:
-        return "Need more data";
-    default:
-        return "Unknown error code";
-    }
-}
 
 //------------------------------------------------------------------------------------------------------------
 constexpr auto fourcc(const char* str) noexcept -> uint32_t
@@ -116,17 +95,6 @@ public:
             static_cast<char>(data[3]),
         }};
     }
-};
-
-//------------------------------------------------------------------------------------------------------------
-template <typename Type>
-struct parsed {
-    Type value;
-    std::size_t consumed;
-};
-struct unexpected {
-    mbmff::error_code code;
-    std::size_t needed;
 };
 
 //------------------------------------------------------------------------------------------------------------
@@ -208,37 +176,6 @@ public:
 struct ispe_header {
     std::uint32_t image_width = 0;
     std::uint32_t image_height = 0;
-};
-
-struct av1C_header {
-    // Byte 0
-    std::uint8_t marker  : 1 = 0; // should be 1
-    std::uint8_t version : 7 = 0; // should be 1
-
-    // Byte 1
-    std::uint8_t seq_profile     : 3 = 0;
-    std::uint8_t seq_level_idx_0 : 5 = 0;
-
-    // Byte 2
-    std::uint8_t seq_tier_0             : 1 = 0;
-    std::uint8_t high_bitdepth          : 1 = 0;
-    std::uint8_t twelve_bit             : 1 = 0;
-    std::uint8_t monochrome             : 1 = 0;
-    std::uint8_t chroma_subsampling_x   : 1 = 0;
-    std::uint8_t chroma_subsampling_y   : 1 = 0;
-    std::uint8_t chroma_sample_position : 2 = 0;
-
-    // Byte 3
-    std::uint8_t reserved : 3 = 0; // should be 0
-    std::uint8_t initial_presentation_delay_present : 1 = 0;
-    std::uint8_t initial_presentation_delay_minus_one : 4 = 0;
-
-    // followed by config OBUs
-    std::span<const std::byte> config_obus{};
-
-public:
-
-    // TODO: parse config OBUs
 };
 
 //------------------------------------------------------------------------------------------------------------
