@@ -22,7 +22,7 @@ int main()
         const auto& box = box_expected.value();
 
         // Get concrete types
-        switch (box.header.type) {
+        switch (box.box_header.type) {
         case mbmff::box_type::ftyp: {
             auto ftyp = mbmff::box_cast<mbmff::box_type::ftyp>(box);
             std::cout << std::format("{}\n", ftyp);
@@ -86,8 +86,22 @@ int main()
             }
 
         } break;
+        case mbmff::box_type::pixi: {
+            auto pixi = mbmff::box_cast<mbmff::box_type::pixi>(box);
+            std::cout << std::format("{}\n", pixi);
+        } break;
+        case mbmff::box_type::ipma: {
+            auto ipma = mbmff::box_cast<mbmff::box_type::ipma>(box);
+            // ipma doesn't have a custom formatter, because we need to intrude into its payload to parse the actual
+            // entries, so we print it manually here
+
+            for (auto entry : mbmff::ipma_entry_iterator(ipma)) {
+                std::cout << std::format("{}\n", entry);
+            }
+        } break;
         default:
-            std::cout << "Box type: " << box.header.type_string().view() << ", size: " << box.header.size << '\n';
+            std::cout << "Box type: " << box.box_header.type_string().view() << ", size: " << box.box_header.size
+                      << '\n';
             break;
         }
     }

@@ -168,9 +168,6 @@ struct iloc_header {
     std::uint8_t index_size = 0;
     std::uint32_t item_count = 0;
     std::span<const std::byte> item_data{};
-
-public:
-    // TODO: item iterator
 };
 
 struct ispe_header {
@@ -178,18 +175,34 @@ struct ispe_header {
     std::uint32_t image_height = 0;
 };
 
+struct ipma_association {
+    std::uint16_t essential      : 1 = false;
+    std::uint16_t property_index : 15 = 0;
+};
+
+struct ipma_entry {
+    std::uint32_t item_id = 0;
+    std::uint8_t entry_count = 0;
+    std::uint8_t entry_size = 0; // size in bytes of each association entry (1 or 2)
+    std::span<const std::byte> association_values{};
+
+public:
+    constexpr auto operator[](std::size_t index) const noexcept -> ipma_association;
+    constexpr auto size() const noexcept -> std::size_t;
+};
+
 //------------------------------------------------------------------------------------------------------------
 
 using any_box_view = struct box_view_base;
 
 struct box_view_base {
-    mbmff::box_header header{};
+    mbmff::box_header box_header{};
     std::span<const std::byte> payload{};
 
 public:
     constexpr operator bool() const noexcept
     {
-        return header.size != 0;
+        return box_header.size != 0;
     }
     constexpr static auto parse(any_box_view box) noexcept -> std::expected<any_box_view, unexpected>
     {
@@ -197,7 +210,7 @@ public:
     }
     constexpr auto version() const noexcept -> std::uint8_t
     {
-        return header.version;
+        return box_header.version;
     }
 };
 
@@ -288,6 +301,17 @@ template <>
 struct basic_box_view<box_type::av1C> : public box_view_base {
     constexpr static properties properties = properties::none;
     constexpr auto header() const noexcept -> av1C_header;
+};
+
+template <>
+struct basic_box_view<box_type::pixi> : public box_view_base {
+    constexpr static properties properties = properties::full_box;
+    constexpr auto bits_per_channel() const noexcept -> std::span<const uint8_t>;
+};
+
+template <>
+struct basic_box_view<box_type::ipma> : public box_view_base {
+    constexpr static properties properties = properties::full_box;
 };
 
 //------------------------------------------------------------------------------------------------------------
@@ -465,7 +489,7 @@ inline constexpr auto basic_box_view<box_type::meta>::parse(any_box_view box) no
     bool full_box = std::memcmp(box.payload.data() + 4, hdlr_type, 4) != 0;
 
     if (full_box) {
-        box.header.fill_full_header(box.payload);
+        box.box_header.fill_full_header(box.payload);
         box.payload = box.payload.subspan(4);
     }
     return box;
@@ -672,10 +696,44 @@ constexpr auto basic_box_view<box_type::av1C>::header() const noexcept -> av1C_h
 }
 
 //------------------------------------------------------------------------------------------------------------
+// PIXI
+constexpr auto basic_box_view<box_type::pixi>::bits_per_channel() const noexcept -> std::span<const uint8_t>
+{
+    std::uint8_t size = static_cast<std::uint8_t>(payload[0]);
+    return std::span<const uint8_t>(
+        static_cast<const std::uint8_t*>(static_cast<const void*>(payload.data() + 1)),
+        size
+    );
+}
+
+//------------------------------------------------------------------------------------------------------------
+// IPMA
+constexpr auto ipma_entry::operator[](std::size_t index) const noexcept -> ipma_association
+{
+    if (index >= entry_count) {
+        return {};
+    }
+    ipma_association association;
+    if (entry_size == 1) {
+        std::uint8_t value = static_cast<std::uint8_t>(association_values[index]);
+        association.essential = (value >> 7) & 0x01;
+        association.property_index = value & 0x7F;
+    } else {
+        std::uint16_t value = read_be<std::uint16_t>(association_values.subspan(index * 2, 2));
+        association.essential = (value >> 15) & 0x01;
+        association.property_index = value & 0x7FFF;
+    }
+    return association;
+}
+constexpr auto ipma_entry::size() const noexcept -> std::size_t
+{
+    return entry_count;
+}
+//------------------------------------------------------------------------------------------------------------
 template <box_type Box>
 constexpr auto box_cast(const any_box_view& box) noexcept -> basic_box_view<Box>
 {
-    if (box.header.type != Box) {
+    if (box.box_header.type != Box) {
         return {};
     }
     return static_cast<basic_box_view<Box>>(box);
@@ -760,7 +818,7 @@ public:
 
         // If recursive flag is set and the box is a container, iterate into it instead of moving to the next sibling
         if (has(flags, iterator_flags::recursive)) {
-            auto properties = get_box_properties(result->header.type);
+            auto properties = get_box_properties(result->box_header.type);
 
             if (has(properties, properties::container)) {
                 auto* current_end = &remaining.back() + 1;
@@ -771,8 +829,8 @@ public:
             }
         }
 
-        std::size_t box_size = (result->header.size == 0) ? remaining.size()
-                                                          : static_cast<std::size_t>(result->header.size);
+        std::size_t box_size = (result->box_header.size == 0) ? remaining.size()
+                                                              : static_cast<std::size_t>(result->box_header.size);
         if (box_size == 0 || box_size > remaining.size()) {
             remaining = {};
         } else {
@@ -793,6 +851,92 @@ public:
             return true;
         }
         return remaining.data() == other.remaining.data() && remaining.size() == other.remaining.size();
+    }
+};
+
+struct ipma_entry_iterator {
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = mbmff::ipma_entry;
+    using difference_type = std::ptrdiff_t;
+
+public:
+    std::uint32_t entry_count = 0;
+    std::uint8_t index_size = 0;
+    std::uint8_t asoc_size = 0;
+    std::span<const std::byte> remaining;
+
+public:
+    constexpr ipma_entry_iterator() noexcept = default;
+    constexpr explicit ipma_entry_iterator(const basic_box_view<box_type::ipma>& box) noexcept
+        : entry_count(read_be<std::uint32_t>(box.payload))
+        , index_size(box.version() == 0 ? 2 : 4)
+        , asoc_size(box.box_header.flags_value() & 0x01 ? 2 : 1)
+        , remaining(box.payload.subspan(4))
+    {}
+
+public:
+    constexpr auto begin() const noexcept -> ipma_entry_iterator
+    {
+        return *this;
+    }
+    constexpr auto end() const noexcept -> ipma_entry_iterator
+    {
+        return {};
+    }
+    constexpr auto get() const noexcept -> ipma_entry
+    {
+        ipma_entry entry{};
+        if (entry_count == 0 || remaining.empty()) {
+            return entry;
+        }
+        if (index_size == 2) {
+            entry.item_id = read_be<std::uint16_t>(remaining);
+            entry.association_values = remaining.subspan(2);
+        } else {
+            entry.item_id = read_be<std::uint32_t>(remaining);
+            entry.association_values = remaining.subspan(4);
+        }
+
+        entry.entry_count = static_cast<std::uint8_t>(entry.association_values[0]);
+        entry.association_values = entry.association_values.subspan(1);
+        entry.entry_size = asoc_size;
+        return entry;
+    }
+    constexpr auto operator*() const noexcept -> ipma_entry
+    {
+        return get();
+    }
+    constexpr auto operator++() noexcept -> ipma_entry_iterator&
+    {
+        if (entry_count == 0 || remaining.empty()) {
+            entry_count = 0;
+            remaining = {};
+            return *this;
+        }
+        entry_count--;
+        auto current_entry = get();
+
+        // Get the size of the current entry
+        std::size_t offset = static_cast<std::size_t>(current_entry.entry_count) * current_entry.entry_size + index_size
+                           + 1;
+
+        remaining = (offset >= remaining.size()) ? std::span<const std::byte>{} : remaining.subspan(offset);
+        return *this;
+    }
+    constexpr auto operator++(int) noexcept -> ipma_entry_iterator
+    {
+        auto tmp = *this;
+        ++(*this);
+        return tmp;
+    }
+    constexpr bool operator==(const ipma_entry_iterator& other) const noexcept
+    {
+        // special case: both iterators are at the end (empty)
+        if (entry_count == 0 && other.entry_count == 0) {
+            return true;
+        }
+        return entry_count == other.entry_count && remaining.data() == other.remaining.data()
+            && remaining.size() == other.remaining.size();
     }
 };
 } // namespace mbmff
@@ -847,7 +991,7 @@ struct std::formatter<mbmff::meta_box> : std::formatter<std::string_view> {
     auto format(const mbmff::meta_box& box, std::format_context& ctx) const
     {
         return std::formatter<std::string_view>::format(
-            std::format("META: version={} flags=0x{:06X}", box.header.version, box.header.flags_value()),
+            std::format("META: version={} flags=0x{:06X}", box.box_header.version, box.box_header.flags_value()),
             ctx
         );
     }
@@ -868,8 +1012,8 @@ struct std::formatter<mbmff::iinf_box> : std::formatter<std::string_view> {
         return std::formatter<std::string_view>::format(
             std::format(
                 "IINF: version={} flags=0x{:06X}, entries={}",
-                box.header.version,
-                box.header.flags_value(),
+                box.box_header.version,
+                box.box_header.flags_value(),
                 box.entry_count()
             ),
             ctx
@@ -983,7 +1127,7 @@ struct std::formatter<mbmff::av1C_box> : std::formatter<std::string_view> {
     {
         auto header = box.header();
         std::string output = std::format(
-            "av1C: profile={} level={} tier={} bitdepth={} monochrome={} chroma_subsampling=({}, {})",
+            "AV1C: profile={} level={} tier={} bitdepth={} monochrome={} chroma_subsampling=({}, {})",
             std::uint8_t(header.seq_profile),
             std::uint8_t(header.seq_level_idx_0),
             header.seq_tier_0 ? "high" : "main",
@@ -993,5 +1137,47 @@ struct std::formatter<mbmff::av1C_box> : std::formatter<std::string_view> {
             header.chroma_subsampling_y ? "1" : "0"
         );
         return std::formatter<std::string_view>::format(output, ctx);
+    }
+};
+
+template <>
+struct std::formatter<mbmff::pixi_box> : std::formatter<std::string_view> {
+    auto format(const mbmff::pixi_box& box, std::format_context& ctx) const
+    {
+        auto bits = box.bits_per_channel();
+        std::string output = std::format("PIXI: bits_per_channel=[");
+        for (std::size_t i = 0; i < bits.size(); ++i) {
+            if (i != 0) {
+                output.append(", ");
+            }
+            output.append(std::format("{}", bits[i]));
+        }
+        return std::formatter<std::string_view>::format(output.append("]"), ctx);
+    }
+};
+
+template <>
+struct std::formatter<mbmff::ipma_association> : std::formatter<std::string_view> {
+    auto format(const mbmff::ipma_association& box, std::format_context& ctx) const
+    {
+        return std::formatter<std::string_view>::format(
+            std::format("ipco_property={} essential={}", box.property_index, box.essential ? "yes" : "no"),
+            ctx
+        );
+    }
+};
+
+template <>
+struct std::formatter<mbmff::ipma_entry> : std::formatter<std::string_view> {
+    auto format(const mbmff::ipma_entry& entry, std::format_context& ctx) const
+    {
+        std::string output = std::format("IPMA Entry: item_id={} associations=[", entry.item_id);
+        for (std::size_t i = 0; i < entry.size(); ++i) {
+            if (i != 0) {
+                output.append(", ");
+            }
+            output += std::format("{{ {} }}", entry[i]);
+        }
+        return std::formatter<std::string_view>::format(output.append("]"), ctx);
     }
 };
