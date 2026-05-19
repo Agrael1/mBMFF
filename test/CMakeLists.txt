@@ -10,7 +10,7 @@ target_link_libraries(mbmff-test PRIVATE mbmff)
 
 # Copy file to output directory
 add_custom_command(TARGET mbmff-test POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/avif_sample.avif"
-        "$<TARGET_FILE_DIR:mbmff-test>/avif_sample.avif"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+        "$<TARGET_FILE_DIR:mbmff-test>/assets"
 )

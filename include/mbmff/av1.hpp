@@ -146,11 +146,11 @@ constexpr auto parse_obu(std::span<const std::byte> data) noexcept -> std::expec
         if (data.size() < offset + 1) {
             return std::unexpected(unexpected{error_code::need_more_data, offset + 1});
         }
-        auto [obu_size, leb128_bytes] = leb128(data.subspan(offset));
+        auto [xobu_size, leb128_bytes] = leb128(data.subspan(offset));
         if (obu_size > obu_view::max_obu_size) {
             return std::unexpected(unexpected{error_code::invalid_format});
         }
-        obu_size = obu_size;
+        obu_size = xobu_size;
         offset += leb128_bytes;
     } else {
         // If no size field is present, the OBU extends to the end of the data
@@ -243,18 +243,3 @@ public:
 
 } // namespace mbmff
 
-// Format specializations
-template <>
-struct std::formatter<mbmff::obu_view> : std::formatter<std::string_view> {
-    auto format(const mbmff::obu_view& obu, std::format_context& ctx) const {
-        std::string output = std::format(
-            "OBU: type={} size={} bytes",
-            mbmff::obu_type_to_string(static_cast<mbmff::obu_type>(obu.type)),
-            obu.payload.size()
-        );
-        if (obu.extension_flag) {
-            output.append(std::format(" Extension: (temporal_id={}, spatial_id={})", obu.temporal_id, obu.spatial_id));
-        }
-        return std::formatter<std::string_view>::format(output, ctx);
-    }
-};

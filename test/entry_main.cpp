@@ -1,12 +1,14 @@
-#include <mbmff/mbmff.hpp>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include "formatters.hpp"
+
+
 
 int main()
 {
-    std::ifstream avif_file("avif_sample.avif", std::ios::binary);
+    std::ifstream avif_file("assets/avif_sample_8_420.avif", std::ios::binary);
     if (!avif_file) {
         std::cerr << "Failed to open the AVIF file.\n";
         return 1; // Failed to open the file
@@ -98,6 +100,10 @@ int main()
             for (auto entry : mbmff::ipma_entry_iterator(ipma)) {
                 std::cout << std::format("{}\n", entry);
             }
+        } break;
+        case mbmff::box_type::pasp: {
+            auto pasp = mbmff::box_cast<mbmff::box_type::pasp>(box);
+            std::cout << std::format("{}\n", pasp);
         } break;
         default:
             std::cout << "Box type: " << box.box_header.type_string().view() << ", size: " << box.box_header.size
