@@ -1,19 +1,91 @@
 #pragma once
+#include <string>
 #include <mbmff/mbmff.hpp>
-#include <format>
+#include <mbmff/av1.hpp>
 
+template<>
+struct std::formatter<mbmff::obu_sequence_header_view> : std::formatter<std::string_view> {
+    auto format(const mbmff::obu_sequence_header_view& view, std::format_context& ctx) const
+    {
+        auto header = view.header();
+        std::string output = std::format(
+            "obu_sequence_header: seq_profile={}, still_picture={}, reduced_still_picture_header={}, "
+            "timing_info_present_flag={}, decoder_model_info_present_flag={}, "
+            "initial_display_delay_present_flag={}, operating_points_cnt_minus_1={}",
+            uint8_t(header.seq_profile),
+            uint8_t(header.still_picture),
+            uint8_t(header.reduced_still_picture_header),
+            uint8_t(header.timing_info_present_flag),
+            uint8_t(header.decoder_model_info_present_flag),
+            uint8_t(header.initial_display_delay_present_flag),
+            uint8_t(header.operating_points_cnt_minus_1)
+        );
+
+        if (header.operating_points_cnt_minus_1 > 0 || true) {
+            output += "\n  Operating Points:";
+            for (std::uint8_t i = 0; i <= header.operating_points_cnt_minus_1; ++i) {
+                const auto& op = header.operating_points[i];
+                output += std::format(
+                    "\n    [{}] idc={}, level_idx={}, tier={}, decoder_model_present={}, initial_display_delay_present={}",
+                    i, op.operating_point_idc, static_cast<uint32_t>(op.seq_level_idx),
+                    op.seq_tier ? "high" : "main",
+                    static_cast<uint32_t>(op.decoder_model_present_for_this_op),
+                    static_cast<uint32_t>(op.initial_display_delay_present_for_this_op)
+                );
+            }
+        }
+
+        output += std::format("\n  Color Config:");
+        output += std::format("\n    high_bitdepth={}, twelve_bit={}, monochrome={}, color_description_present={}", 
+            static_cast<uint32_t>(header.color_config_data.high_bitdepth),
+            static_cast<uint32_t>(header.color_config_data.twelve_bit),
+            static_cast<uint32_t>(header.color_config_data.monochrome),
+            static_cast<uint32_t>(header.color_config_data.color_description_present_flag)
+        );
+
+        if (header.color_config_data.color_description_present_flag) {
+            const auto& cd = header.color_config_data.color_description_data;
+            output += std::format("\n    color_primaries={}, transfer_characteristics={}, matrix_coefficients={}", 
+                mbmff::to_string(cd.color_primaries),
+                mbmff::to_string(cd.transfer_characteristics),
+                mbmff::to_string(cd.matrix_coefficients)
+            );
+        }
+
+        output += std::format("\n  Frame Max Dimensions: {}x{}",
+            header.max_frame_width_minus_1 + 1,
+            header.max_frame_height_minus_1 + 1
+        );
+
+        return std::formatter<std::string_view>::format(output, ctx);
+    }
+};
+
+//------------------------------------------------------------------------------------------------------------
 template <>
-struct std::formatter<mbmff::obu_view> : std::formatter<std::string_view> {
-    auto format(const mbmff::obu_view& obu, std::format_context& ctx) const
+struct std::formatter<mbmff::any_obu_view> : std::formatter<std::string_view> {
+    auto format(const mbmff::any_obu_view& box, format_context& ctx) const -> format_context::iterator
     {
         std::string output = std::format(
-            "OBU: type={} size={} bytes",
-            mbmff::obu_type_to_string(static_cast<mbmff::obu_type>(obu.type)),
-            obu.payload.size()
+            "OBU: type={}",
+            mbmff::to_string(static_cast<mbmff::obu_type>(box.type))
         );
-        if (obu.extension_flag) {
-            output.append(std::format(" Extension: (temporal_id={}, spatial_id={})", obu.temporal_id, obu.spatial_id));
+
+        // Add size field if present
+        if (box.has_size_field) {
+            output += std::format(", size_field=1");
         }
+        
+        // Add extension fields
+        if (box.extension_flag) {
+            output += std::format(
+                ", temporal_id={}, spatial_id={}", 
+                box.temporal_id, 
+                box.spatial_id
+            );
+        }
+
+        output += "}";
         return std::formatter<std::string_view>::format(output, ctx);
     }
 };

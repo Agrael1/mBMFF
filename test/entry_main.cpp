@@ -84,6 +84,12 @@ int main()
                     break;
                 }
 
+                if (obu->type == mbmff::obu_type::sequence_header) {
+                    auto seq_header_obu = mbmff::obu_cast<mbmff::obu_type::sequence_header>(*obu);
+                    std::cout << std::format("    Sequence Header OBU: {}\n", seq_header_obu);
+                    break;
+                }
+
                 std::cout << std::format("    {}:{}\n", i++, obu.value());
             }
 

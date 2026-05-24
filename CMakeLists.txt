@@ -1,9 +1,27 @@
-﻿cmake_minimum_required (VERSION 3.22)
-if (MSVC)
-    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
-endif()
+﻿cmake_minimum_required(VERSION 3.22)
+project(mBMFF VERSION 0.1.0 LANGUAGES CXX)
 
-project ("mBMFF")
+include(GNUInstallDirs)
+
+add_library(mbmff INTERFACE)
+add_library(mbmff::mbmff ALIAS mbmff)
+
+target_include_directories(mbmff INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+install(TARGETS mbmff
+    EXPORT mbmffTargets
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+install(EXPORT mbmffTargets
+    FILE mbmffTargets.cmake
+    NAMESPACE mbmff::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mbmff
+)
 
 # Determine if this is the top-level project
 if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -13,15 +31,6 @@ else()
 endif()
 
 option(MBMFF_BUILD_TEST "Build tests" ${MBMFF_TOP_LEVEL})
-
-add_library(mbmff INTERFACE)
-target_include_directories(mbmff INTERFACE "include")
-set_target_properties(mbmff PROPERTIES
-    CXX_STANDARD 23
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-)
-
 if (MBMFF_BUILD_TEST)
     add_subdirectory(test)
 endif()
