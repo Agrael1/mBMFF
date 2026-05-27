@@ -56,3 +56,14 @@ int main() {
     }
 }
 ```
+
+## Consumption
+the library is header only. You can:
+
+- Copy headers directly
+- Use FetchContent/CPM and consume via CMake
+- Use Conan package manager
+
+## Project and contribution
+
+I can only work on this project on my free time, but if there is an actual need for a super lean parsing with blazing speeds, for example for Vulkan Video, feel free to extend the library.
