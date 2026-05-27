@@ -52,26 +52,26 @@ constexpr auto fourcc(const char* str) noexcept -> uint32_t
 enum class box_type : uint32_t { unknown, MBMFF_ITERATE_BOX_TYPES(MBMFF_ITERATE_ENUM) };
 
 //------------------------------------------------------------------------------------------------------------
-enum class properties : uint32_t {
+enum class box_properties : uint32_t {
     none = 0,
     full_box = 1 << 0,
     container = 1 << 1,
 };
-constexpr auto operator|(properties a, properties b) noexcept -> properties
+constexpr auto operator|(box_properties a, box_properties b) noexcept -> box_properties
 {
-    return static_cast<properties>(std::to_underlying(a) | std::to_underlying(b));
+    return static_cast<box_properties>(std::to_underlying(a) | std::to_underlying(b));
 }
-constexpr auto operator&(properties a, properties b) noexcept -> properties
+constexpr auto operator&(box_properties a, box_properties b) noexcept -> box_properties
 {
-    return static_cast<properties>(std::to_underlying(a) & std::to_underlying(b));
+    return static_cast<box_properties>(std::to_underlying(a) & std::to_underlying(b));
 }
-constexpr auto operator+(properties a) noexcept -> std::underlying_type_t<properties>
+constexpr auto operator+(box_properties a) noexcept -> std::underlying_type_t<box_properties>
 {
     return std::to_underlying(a);
 }
-constexpr auto has(properties a, properties check) noexcept -> bool
+constexpr auto has(box_properties a, box_properties check) noexcept -> bool
 {
-    return (a & check) != properties::none;
+    return (a & check) != box_properties::none;
 }
 
 //------------------------------------------------------------------------------------------------------------
@@ -249,7 +249,7 @@ public:
 
 template <box_type Type>
 struct basic_box_view : public box_view_base {
-    constexpr static properties properties = properties::none;
+    constexpr static box_properties properties = box_properties::none;
 };
 
 //------------------------------------------------------------------------------------------------------------
@@ -257,7 +257,7 @@ struct basic_box_view : public box_view_base {
 //------------------------------------------------------------------------------------------------------------
 template <>
 struct basic_box_view<box_type::ftyp> : public box_view_base {
-    constexpr static properties properties = properties::none;
+    constexpr static box_properties properties = box_properties::none;
     constexpr static auto parse(any_box_view box) noexcept -> std::expected<any_box_view, unexpected>;
 
 public:
@@ -271,26 +271,26 @@ template <>
 struct basic_box_view<box_type::meta> : public box_view_base {
     // full_box is not ticked here because `meta` can
     // be a regular box in some formats (e.g. QTFF)
-    constexpr static properties properties = properties::container;
+    constexpr static box_properties properties = box_properties::container;
     constexpr static auto parse(any_box_view box) noexcept -> std::expected<any_box_view, unexpected>;
 };
 
 template <>
 struct basic_box_view<box_type::mdat> : public box_view_base {
     constexpr auto data_size() const noexcept -> std::size_t;
-    constexpr static properties properties = properties::none;
+    constexpr static box_properties properties = box_properties::none;
 };
 
 template <>
 struct basic_box_view<box_type::iinf> : public box_view_base {
-    constexpr static properties properties = properties::container | properties::full_box;
+    constexpr static box_properties properties = box_properties::container | box_properties::full_box;
     constexpr static auto parse(any_box_view box) noexcept -> std::expected<any_box_view, unexpected>;
     constexpr auto entry_count() const noexcept -> std::uint32_t;
 };
 
 template <>
 struct basic_box_view<box_type::infe> : public box_view_base {
-    constexpr static properties properties = properties::full_box;
+    constexpr static box_properties properties = box_properties::full_box;
     constexpr auto header() const noexcept -> infe_header;
     constexpr auto item_id() const noexcept -> std::uint32_t;
     constexpr auto item_protection_index() const noexcept -> std::uint16_t;
@@ -298,58 +298,58 @@ struct basic_box_view<box_type::infe> : public box_view_base {
 
 template <>
 struct basic_box_view<box_type::hdlr> : public box_view_base {
-    constexpr static properties properties = properties::full_box;
+    constexpr static box_properties properties = box_properties::full_box;
     constexpr auto header() const noexcept -> hdlr_header;
 };
 
 template <>
 struct basic_box_view<box_type::pitm> : public box_view_base {
-    constexpr static properties properties = properties::full_box;
+    constexpr static box_properties properties = box_properties::full_box;
     constexpr auto item_id() const noexcept -> uint32_t;
 };
 
 template <>
 struct basic_box_view<box_type::iloc> : public box_view_base {
-    constexpr static properties properties = properties::full_box;
+    constexpr static box_properties properties = box_properties::full_box;
     constexpr auto header() const noexcept -> iloc_header;
 };
 
 template <>
 struct basic_box_view<box_type::iprp> : public box_view_base {
-    constexpr static properties properties = properties::container;
+    constexpr static box_properties properties = box_properties::container;
 };
 
 template <>
 struct basic_box_view<box_type::ipco> : public box_view_base {
-    constexpr static properties properties = properties::container;
+    constexpr static box_properties properties = box_properties::container;
 };
 
 template <>
 struct basic_box_view<box_type::ispe> : public box_view_base {
-    constexpr static properties properties = properties::full_box;
+    constexpr static box_properties properties = box_properties::full_box;
     constexpr auto header() const noexcept -> ispe_header;
 };
 
 template <>
 struct basic_box_view<box_type::av1C> : public box_view_base {
-    constexpr static properties properties = properties::none;
+    constexpr static box_properties properties = box_properties::none;
     constexpr auto header() const noexcept -> av1C_header;
 };
 
 template <>
 struct basic_box_view<box_type::pixi> : public box_view_base {
-    constexpr static properties properties = properties::full_box;
+    constexpr static box_properties properties = box_properties::full_box;
     constexpr auto bits_per_channel() const noexcept -> std::span<const uint8_t>;
 };
 
 template <>
 struct basic_box_view<box_type::ipma> : public box_view_base {
-    constexpr static properties properties = properties::full_box;
+    constexpr static box_properties properties = box_properties::full_box;
 };
 
 template <>
 struct basic_box_view<box_type::pasp> : public box_view_base {
-    constexpr static properties properties = properties::none;
+    constexpr static box_properties properties = box_properties::none;
     constexpr auto aspect_ratio() const noexcept -> std::pair<uint32_t, uint32_t>;
 };
 
@@ -429,7 +429,7 @@ constexpr inline auto parse_box_header(std::span<const std::byte> data) noexcept
     return parsed<box_header>{box_header{size, type}, size == 1 ? 16u : 8u};
 }
 
-inline constexpr auto get_box_properties(box_type type) noexcept -> properties
+inline constexpr auto get_box_properties(box_type type) noexcept -> box_properties
 {
 #define MBMFF_CASE_ITERATE(box) \
     case box_type::box:         \
@@ -438,7 +438,7 @@ inline constexpr auto get_box_properties(box_type type) noexcept -> properties
     switch (type) {
         MBMFF_ITERATE_BOX_TYPES(MBMFF_CASE_ITERATE)
     default:
-        return properties::none;
+        return box_properties::none;
     }
 #undef MBMFF_CASE_ITERATE
 }
@@ -462,8 +462,8 @@ inline constexpr auto parse(std::span<const std::byte> data) noexcept -> std::ex
                                                   : (static_cast<std::size_t>(header.size) - header_result->consumed);
     auto payload_span = data.subspan(header_result->consumed, payload_size);
 
-    properties box_properties = get_box_properties(header.type);
-    if ((box_properties & properties::full_box) != properties::none) {
+    box_properties properties = get_box_properties(header.type);
+    if ((properties & box_properties::full_box) != box_properties::none) {
         if (payload_span.size() < 4) {
             return std::unexpected(unexpected{error_code::need_more_data, 4});
         }
@@ -914,7 +914,7 @@ public:
         if (has(flags_, iterator_flags::recursive)) {
             auto properties = get_box_properties(result->box_header.type);
 
-            if (has(properties, properties::container)) {
+            if (has(properties, box_properties::container)) {
                 auto* current_end = &remaining_.back() + 1;
                 auto* payload_start = &result->payload[0];
 
