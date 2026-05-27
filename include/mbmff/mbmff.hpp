@@ -155,11 +155,43 @@ struct hdlr_header {
     std::string_view name{};
 };
 
+struct iloc_extent {
+    std::uint64_t index = 0;
+    std::uint64_t offset = 0;
+    std::uint64_t length = 0;
+};
+
 struct iloc_item {
-    std::uint32_t item_id = 0;
-    std::uint8_t construction_method = 0;
     std::uint64_t base_offset = 0;
+    std::uint32_t item_id = 0;
+
+    // Redundant fields for easier parsing
+    std::uint8_t iloc_version = 0;
+    std::uint8_t offset_size = 0;
+    std::uint8_t length_size = 0;
+    std::uint8_t index_size = 0;
+
+    std::uint8_t construction_method = 0;
+
+    std::uint16_t data_reference_index = 0;
     std::uint32_t extent_count = 0;
+
+    std::span<const std::byte> extent_data{};
+
+public:
+    constexpr auto get_extent(std::size_t index) const noexcept -> iloc_extent;
+    constexpr auto size() const noexcept -> std::size_t
+    {
+        return extent_count;
+    }
+    constexpr auto operator[](std::size_t index) const noexcept -> iloc_extent
+    {
+        return get_extent(index);
+    }
+    constexpr auto extent_size() const noexcept -> std::size_t
+    {
+        return std::size_t(offset_size) + length_size + index_size;
+    }
 };
 
 struct iloc_header {
@@ -332,8 +364,15 @@ MBMFF_ITERATE_BOX_TYPES(MBMFF_ITERATE_USING)
 template <std::integral T>
 constexpr auto read_be(std::span<const std::byte> data) noexcept -> T
 {
-    T value;
-    std::memcpy(&value, data.data(), sizeof(value)); // strict aliasing
+    T value{};
+    if (std::is_constant_evaluated()) {
+        for (std::size_t i = 0; i < sizeof(T); ++i) {
+            value <<= 8;
+            value |= static_cast<T>(data[i]);
+        }
+    } else {
+        std::memcpy(&value, data.data(), sizeof(value)); // strict aliasing
+    }
     return std::byteswap(value);
 }
 
@@ -493,7 +532,18 @@ inline constexpr auto basic_box_view<box_type::meta>::parse(any_box_view box) no
     // In ISOBMFF, `meta` is a Full Box. Its payload starts with 4 bytes (version+flags), then the child box
     // `[size][hdlr]`.
     constexpr auto hdlr_type = "hdlr";
-    bool full_box = std::memcmp(box.payload.data() + 4, hdlr_type, 4) != 0;
+    bool full_box = false;
+
+    if (std::is_constant_evaluated()) {
+        for (int i = 0; i < 4; ++i) {
+            if (box.payload.size() < 4 || box.payload[i] != std::byte(hdlr_type[i])) {
+                full_box = true;
+                break;
+            }
+        }
+    } else {
+        full_box = std::memcmp(box.payload.data() + 4, hdlr_type, 4) != 0;
+    }
 
     if (full_box) {
         box.box_header.fill_full_header(box.payload);
@@ -649,6 +699,42 @@ constexpr auto basic_box_view<box_type::iloc>::header() const noexcept -> iloc_h
         result.item_data = xpayload.subspan(4);
     }
     return result;
+}
+
+constexpr auto mbmff::iloc_item::get_extent(std::size_t index) const noexcept -> iloc_extent
+{
+    std::span<const std::byte> entry_span = extent_data.subspan(index * extent_size(), extent_size());
+    iloc_extent extent{};
+
+    std::uint32_t offset = 0;
+    if ((iloc_version == 1 || iloc_version == 2) && index_size > 0) {
+        if (index_size == 2) {
+            extent.index = read_be<std::uint16_t>(entry_span);
+        } else if (index_size == 4) {
+            extent.index = read_be<std::uint32_t>(entry_span);
+        } else if (index_size == 8) {
+            extent.index = read_be<std::uint64_t>(entry_span);
+        }
+        offset += index_size;
+    }
+
+    if (offset_size == 2) {
+        extent.offset = read_be<std::uint16_t>(entry_span.subspan(offset));
+    } else if (offset_size == 4) {
+        extent.offset = read_be<std::uint32_t>(entry_span.subspan(offset));
+    } else if (offset_size == 8) {
+        extent.offset = read_be<std::uint64_t>(entry_span.subspan(offset));
+    }
+    offset += offset_size;
+
+    if (length_size == 2) {
+        extent.length = read_be<std::uint16_t>(entry_span.subspan(offset));
+    } else if (length_size == 4) {
+        extent.length = read_be<std::uint32_t>(entry_span.subspan(offset));
+    } else if (length_size == 8) {
+        extent.length = read_be<std::uint64_t>(entry_span.subspan(offset));
+    }
+    return extent;
 }
 
 //------------------------------------------------------------------------------------------------------------
@@ -947,7 +1033,140 @@ public:
             && remaining_.size() == other.remaining_.size();
     }
 };
+
+struct iloc_item_iterator {
+    using iterator_category = std::forward_iterator_tag;
+    using value_type = mbmff::iloc_item;
+    using difference_type = std::ptrdiff_t;
+
+private:
+    std::span<const std::byte> remaining_;
+    std::uint8_t iloc_version_ = 0;
+    std::uint8_t offset_size_ = 0;
+    std::uint8_t length_size_ = 0;
+    std::uint8_t index_size_ = 0;
+    std::uint8_t base_offset_size_ = 0;
+
+public:
+    constexpr iloc_item_iterator() noexcept = default;
+    constexpr iloc_item_iterator(const iloc_header& header, std::uint8_t version) noexcept
+        : remaining_(header.item_data)
+        , iloc_version_(version)
+        , offset_size_(header.offset_size)
+        , length_size_(header.length_size)
+        , index_size_(header.index_size)
+        , base_offset_size_(header.base_offset_size)
+    {}
+    constexpr explicit iloc_item_iterator(const basic_box_view<box_type::iloc>& box) noexcept
+        : iloc_item_iterator(box.header(), box.version())
+    {}
+
+public:
+    constexpr auto extent_size() const noexcept -> std::size_t
+    {
+        return std::size_t(offset_size_) + length_size_ + (index_size_ > 0 ? index_size_ : 0);
+    }
+    constexpr auto begin() const noexcept -> iloc_item_iterator
+    {
+        return *this;
+    }
+    constexpr auto end() const noexcept -> iloc_item_iterator
+    {
+        return {};
+    }
+    constexpr auto get() const noexcept -> iloc_item
+    {
+        iloc_item item{};
+        if (remaining_.empty()) {
+            return item;
+        }
+
+        std::size_t offset = 0;
+
+        // Read item_id
+        if (iloc_version_ < 2) {
+            item.item_id = read_be<std::uint16_t>(remaining_);
+            offset += 2;
+        } else {
+            item.item_id = read_be<std::uint32_t>(remaining_);
+            offset += 4;
+        }
+
+        // Read construction_method
+        if (iloc_version_ == 1 || iloc_version_ == 2) {
+            std::uint16_t value = read_be<std::uint16_t>(remaining_.subspan(offset));
+            item.construction_method = static_cast<std::uint8_t>(value & 0x000F); // lower 4 bits
+            offset += 2;
+        }
+
+        // Read data_reference_index
+        item.data_reference_index = read_be<std::uint16_t>(remaining_.subspan(offset));
+        offset += 2;
+
+        switch (base_offset_size_) {
+        default:
+        case 0:
+            item.base_offset = 0;
+            break;
+        case 2:
+            item.base_offset = read_be<std::uint16_t>(remaining_.subspan(offset));
+            break;
+        case 4:
+            item.base_offset = read_be<std::uint32_t>(remaining_.subspan(offset));
+            break;
+        case 8:
+            item.base_offset = read_be<std::uint64_t>(remaining_.subspan(offset));
+            break;
+        }
+        offset += base_offset_size_;
+
+        item.extent_count = read_be<std::uint16_t>(remaining_.subspan(offset));
+        item.extent_data = remaining_.subspan(offset + 2);
+
+        // fill redundant fields for easier access
+        item.iloc_version = iloc_version_;
+        item.offset_size = offset_size_;
+        item.length_size = length_size_;
+        item.index_size = index_size_;
+        return item;
+    }
+
+    constexpr auto operator*() const noexcept -> iloc_item
+    {
+        return get();
+    }
+
+    constexpr auto operator++() noexcept -> iloc_item_iterator&
+    {
+        if (remaining_.empty()) {
+            remaining_ = {};
+            return *this;
+        }
+        auto current_item = get();
+        const std::byte* data = current_item.extent_data.data();
+        std::size_t total_extent_size = current_item.extent_count * extent_size();
+
+        remaining_ = {data + total_extent_size, remaining_.size() - (data - remaining_.data()) - total_extent_size};
+
+        return *this;
+    }
+
+    constexpr auto operator++(int) noexcept -> iloc_item_iterator
+    {
+        auto tmp = *this;
+        ++(*this);
+        return tmp;
+    }
+    constexpr bool operator==(const iloc_item_iterator& other) const noexcept
+    {
+        // special case: both iterators are at the end (empty)
+        if (remaining_.empty() && other.remaining_.empty()) {
+            return true;
+        }
+        return remaining_.data() == other.remaining_.data() && remaining_.size() == other.remaining_.size();
+    }
+};
+
 } // namespace mbmff
 
 #undef MBMFF_ITERATE_BOX_TYPES
-

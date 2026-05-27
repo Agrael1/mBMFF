@@ -720,7 +720,7 @@ public:
         : data(data)
     {}
     constexpr explicit obu_iterator(const av1C_header& header) noexcept
-        : data(header.config_obus)
+        : obu_iterator(header.config_obus)
     {}
 
 public:

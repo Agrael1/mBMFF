@@ -17,6 +17,8 @@ int main()
     std::vector<char> file_data((std::istreambuf_iterator<char>(avif_file)), std::istreambuf_iterator<char>());
     std::span<const std::byte> file_data_span(reinterpret_cast<const std::byte*>(file_data.data()), file_data.size());
 
+    uint32_t primary_item_id = 0;
+
     for (const auto& box_expected : mbmff::box_iterator(file_data_span, mbmff::iterator_flags::recursive)) {
         if (!box_expected) {
             break;
@@ -44,6 +46,7 @@ int main()
         case mbmff::box_type::pitm: {
             auto pitm = mbmff::box_cast<mbmff::box_type::pitm>(box);
             std::cout << std::format("{}\n", pitm);
+            primary_item_id = pitm.item_id();
         } break;
         case mbmff::box_type::iinf: {
             auto iinf = mbmff::box_cast<mbmff::box_type::iinf>(box);
@@ -52,6 +55,10 @@ int main()
         case mbmff::box_type::iloc: {
             auto iloc = mbmff::box_cast<mbmff::box_type::iloc>(box);
             std::cout << std::format("{}\n", iloc);
+
+            for (const auto& item : mbmff::iloc_item_iterator(iloc)) {
+                std::cout << std::format("  {}\n", item);
+            }
         } break;
         case mbmff::box_type::iprp: {
             auto iprp = mbmff::box_cast<mbmff::box_type::iprp>(box);

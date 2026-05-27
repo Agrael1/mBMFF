@@ -361,6 +361,35 @@ struct std::formatter<mbmff::ipma_entry> : std::formatter<std::string_view> {
 };
 
 template <>
+struct std::formatter<mbmff::iloc_extent> : std::formatter<std::string_view> {
+    auto format(const mbmff::iloc_extent& extent, std::format_context& ctx) const
+    {
+        return std::formatter<std::string_view>::format(
+            std::format("extent(index={} offset={} length={})", extent.index, extent.offset, extent.length),
+            ctx
+        );
+    }
+};
+
+template <>
+struct std::formatter<mbmff::iloc_item> : std::formatter<std::string_view> {
+    auto format(const mbmff::iloc_item& item, std::format_context& ctx) const
+    {
+        std::string output = std::format(
+            "ILOC Item: item_id={} base_offset={} construction_method={} data_reference_index={} extents=[",
+            item.item_id, item.base_offset, item.construction_method, item.data_reference_index
+        );
+        for (std::size_t i = 0; i < item.size(); ++i) {
+            if (i != 0) {
+                output.append(", ");
+            }
+            output += std::format("{}", item[i]);
+        }
+        return std::formatter<std::string_view>::format(output.append("]"), ctx);
+    }
+};
+
+template <>
 struct std::formatter<mbmff::pasp_box> : std::formatter<std::string_view> {
     auto format(const mbmff::pasp_box& box, std::format_context& ctx) const
     {
