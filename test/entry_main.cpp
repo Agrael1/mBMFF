@@ -18,6 +18,7 @@ int main()
     std::span<const std::byte> file_data_span(reinterpret_cast<const std::byte*>(file_data.data()), file_data.size());
 
     uint32_t primary_item_id = 0;
+    mbmff::iloc_box iloc_box;
 
     for (const auto& box_expected : mbmff::box_iterator(file_data_span, mbmff::iterator_flags::recursive)) {
         if (!box_expected) {
@@ -55,10 +56,7 @@ int main()
         case mbmff::box_type::iloc: {
             auto iloc = mbmff::box_cast<mbmff::box_type::iloc>(box);
             std::cout << std::format("{}\n", iloc);
-
-            for (const auto& item : mbmff::iloc_item_iterator(iloc)) {
-                std::cout << std::format("  {}\n", item);
-            }
+            iloc_box = iloc;
         } break;
         case mbmff::box_type::iprp: {
             auto iprp = mbmff::box_cast<mbmff::box_type::iprp>(box);
@@ -81,7 +79,7 @@ int main()
             std::cout << std::format("{}\n", av1C);
 
             // scan OBUs in the av1C payload
-            for (std::uint32_t i = 0; const auto& obu : mbmff::obu_iterator(av1C.header())) {
+            for (std::uint32_t i = 0; const auto& obu : mbmff::av1::obu_iterator(av1C.header())) {
                 if (!obu) {
                     std::cout << std::format(
                         "    OBU parsing error: code={}, needed={}\n",
@@ -91,8 +89,8 @@ int main()
                     break;
                 }
 
-                if (obu->type == mbmff::obu_type::sequence_header) {
-                    auto seq_header_obu = mbmff::obu_cast<mbmff::obu_type::sequence_header>(*obu);
+                if (obu->type == mbmff::av1::obu_type::sequence_header) {
+                    auto seq_header_obu = mbmff::av1::obu_cast<mbmff::av1::obu_type::sequence_header>(*obu);
                     std::cout << std::format("    Sequence Header OBU: {}\n", seq_header_obu);
                     break;
                 }
@@ -123,6 +121,37 @@ int main()
                       << '\n';
             break;
         }
+    }
+
+    // parse iloc box to find the offset and size of the primary item in the mdat box
+    uint64_t item_data_offset = 0;
+    uint64_t item_data_size = 0;
+    for (const auto& item : mbmff::iloc_item_iterator(iloc_box)) {
+        if (item.item_id == primary_item_id) {
+            std::cout << std::format(
+                "Primary item found in iloc box: {}\n",
+                item
+            );
+            item_data_offset = item.base_offset;
+            item_data_size = item[0].length;
+            break;
+        }
+    }
+
+    // Seek to the primary item in the mdat box and print the first few bytes of its data
+    auto primary_item_span = file_data_span.subspan(item_data_offset, item_data_size);
+    auto primary_obu = mbmff::av1::obu_iterator(primary_item_span);
+
+    for (std::uint32_t i = 0; const auto& obu : primary_obu) {
+        if (!obu) {
+            std::cout << std::format(
+                "Primary item OBU parsing error: code={}, needed={}\n",
+                obu.error().code,
+                obu.error().needed
+            );
+            break;
+        }
+        std::cout << std::format("Primary item OBU {}: {}\n", i++, obu.value());
     }
 
     return 0;

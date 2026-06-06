@@ -333,7 +333,7 @@ struct basic_box_view<box_type::ispe> : public box_view_base {
 template <>
 struct basic_box_view<box_type::av1C> : public box_view_base {
     constexpr static box_properties properties = box_properties::none;
-    constexpr auto header() const noexcept -> av1C_header;
+    constexpr auto header() const noexcept -> av1::av1C_header;
 };
 
 template <>
@@ -749,9 +749,9 @@ constexpr auto basic_box_view<box_type::ispe>::header() const noexcept -> ispe_h
 
 //------------------------------------------------------------------------------------------------------------
 // AV1C
-constexpr auto basic_box_view<box_type::av1C>::header() const noexcept -> av1C_header
+constexpr auto basic_box_view<box_type::av1C>::header() const noexcept -> av1::av1C_header
 {
-    av1C_header result{};
+    av1::av1C_header result{};
     if (payload.size() < 3) {
         return result;
     }

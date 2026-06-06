@@ -4,8 +4,8 @@
 #include <mbmff/av1.hpp>
 
 template<>
-struct std::formatter<mbmff::obu_sequence_header_view> : std::formatter<std::string_view> {
-    auto format(const mbmff::obu_sequence_header_view& view, std::format_context& ctx) const
+struct std::formatter<mbmff::av1::obu_sequence_header_view> : std::formatter<std::string_view> {
+    auto format(const mbmff::av1::obu_sequence_header_view& view, std::format_context& ctx) const
     {
         auto header = view.header();
         std::string output = std::format(
@@ -46,9 +46,9 @@ struct std::formatter<mbmff::obu_sequence_header_view> : std::formatter<std::str
         if (header.color_config_data.color_description_present_flag) {
             const auto& cd = header.color_config_data.color_description_data;
             output += std::format("\n    color_primaries={}, transfer_characteristics={}, matrix_coefficients={}", 
-                mbmff::to_string(cd.color_primaries),
-                mbmff::to_string(cd.transfer_characteristics),
-                mbmff::to_string(cd.matrix_coefficients)
+                mbmff::av1::to_string(cd.color_primaries),
+                mbmff::av1::to_string(cd.transfer_characteristics),
+                mbmff::av1::to_string(cd.matrix_coefficients)
             );
         }
 
@@ -63,12 +63,12 @@ struct std::formatter<mbmff::obu_sequence_header_view> : std::formatter<std::str
 
 //------------------------------------------------------------------------------------------------------------
 template <>
-struct std::formatter<mbmff::any_obu_view> : std::formatter<std::string_view> {
-    auto format(const mbmff::any_obu_view& box, format_context& ctx) const -> format_context::iterator
+struct std::formatter<mbmff::av1::any_obu_view> : std::formatter<std::string_view> {
+    auto format(const mbmff::av1::any_obu_view& box, format_context& ctx) const -> format_context::iterator
     {
         std::string output = std::format(
             "OBU: type={}",
-            mbmff::to_string(static_cast<mbmff::obu_type>(box.type))
+            mbmff::av1::to_string(static_cast<mbmff::av1::obu_type>(box.type))
         );
 
         // Add size field if present
