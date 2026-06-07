@@ -35,6 +35,16 @@ struct unexpected {
     std::size_t needed;
 };
 
+constexpr auto floor_log2(std::uint64_t value) noexcept -> std::uint32_t
+{
+    std::uint32_t log = 0;
+    while (value != 0) {
+        value >>= 1;
+        log++;
+    }
+    return log - 1;
+}
+
 //------------------------------------------------------------------------------------------------------------
 struct bit_reader {
     std::span<const std::byte> data{};
@@ -66,6 +76,11 @@ public:
         return value;
     }
 
+    constexpr auto read_flag() noexcept -> bool
+    {
+        return read_bits(1) != 0;
+    }
+
     constexpr auto uvlc() noexcept -> std::uint32_t
     {
         std::size_t leading_zero_bits = 0;
@@ -76,6 +91,31 @@ public:
         }
         std::size_t value = read_bits(leading_zero_bits);
         return value + ((1u << leading_zero_bits) - 1);
+    }
+
+    // non-symmetric
+    constexpr auto ns(std::size_t n) -> std::uint32_t
+    {
+        std::uint32_t w = floor_log2(n) + 1;
+        std::uint32_t m = (1u << w) - n;
+        std::uint64_t v = read_bits(w - 1);
+
+        if (v < m) {
+            return v;
+        }
+
+        std::uint32_t extra_bit = read_bits(1);
+        return (v << 1) - m + extra_bit;
+    }
+
+    constexpr auto su(std::size_t n) -> std::int32_t
+    {
+        std::uint32_t v = read_bits(n);
+        std::uint32_t sign_bit = 1u << (n - 1);
+        if (v & sign_bit) {
+            return static_cast<std::int32_t>(v) - 2 * sign_bit;
+        }
+        return static_cast<std::int32_t>(v);
     }
 };
 } // namespace mbmff
