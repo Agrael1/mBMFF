@@ -1,69 +1,77 @@
 # mBMFF
 
-mBMFF is a library that primarily serves as an ISO-BMFF parser.
-For now it only supportss AVIF.
-It is designed with extensibility in mind and can be extended to support additional media formats and features in future versions.
+[![CI](https://img.shields.io/github/actions/workflow/status/Agrael1/mBMFF/ci.yml?branch=master&label=CI&logo=github)](https://github.com/Agrael1/mBMFF/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/Agrael1/mBMFF)](LICENSE.txt)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue)](VERSION)
+[![C++](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=cplusplus)](CMakeLists.txt)
+[![Header-only](https://img.shields.io/badge/header--only-yellowgreen)](include/mbmff)
 
-## How it works
+A lightweight, dependency-free ISOBMFF (ISO Base Media File Format) parser written in modern C++20. Parses AVIF, HEIF, MP4, and any other ISO-BMFF container.
 
-The library operates without any dependencies, making it lightweight and easy to integrate into various projects. 
-It never allocates memory on its own, instead it relies on the caller to provide memory to parse.
+## Features
 
-The API is built around iterators. Boxes are parsed lazily, meaning that the library only parses the boxes that are requested by the caller.
-Parsing is done in a resursive manner:
+- **Zero dependencies** — no external libraries required
+- **Zero allocations** — operates directly on caller-provided memory
+- **Lazy parsing** — boxes are parsed on demand, skip what you don't need
+- **Single-header amalgamation** — generate a single `mbmff.hpp` via the `amalgamate` CMake target for easy drop-in
+- **Constexpr validation** — box structures are validated at compile time where possible (behind `MBMFF_ENABLE_CONSTEXPR_TEST`)
+- **Iterators** — traverse boxes with `box_iterator` (flat or recursive)
 
-- The caller uses box_iterator to iterate over box headers. This allows the caller to quickly skip over boxes that are not of interest.
-- Then the caller can use box_cast to cast the box header to a specific box type.
-- After the box is cast to the type of interest, the caller can use the box's API to access its contents, which are also parsed lazily.
-
-## Requirements
-
-- C\+\+23 or later (use of std::span, std::expected and other C++23 features)
-- yes, all you need is a C++23 compliant compiler and the standard library.
-
-## Example
-
-The example is in the `test` directory, but here is a simple example of how to use the library to parse an AVIF file:
+## Quick start
 
 ```cpp
 #include <mbmff/mbmff.hpp>
+#include <fstream>
+#include <iostream>
+#include <vector>
 
-int main() {
-    std::ifstream avif_file("assets/avif_sample_8_420.avif", std::ios::binary);
-    if (!avif_file) {
-        std::cerr << "Failed to open the AVIF file.\n";
-        return 1; // Failed to open the file
-    }
+int main(int argc, char* argv[])
+{
+    std::ifstream file(argv[1], std::ios::binary);
+    std::vector<char> data((std::istreambuf_iterator<char>(file)), {});
 
-    // Read the entire file into a vector of chars
-    std::vector<char> file_data((std::istreambuf_iterator<char>(avif_file)), std::istreambuf_iterator<char>());
-    std::span<const std::byte> file_data_span(reinterpret_cast<const std::byte*>(file_data.data()), file_data.size());
+    for (const auto& result : mbmff::box_iterator(
+             std::span(reinterpret_cast<const std::byte*>(data.data()), data.size()),
+             mbmff::iterator_flags::recursive))
+    {
+        if (!result) break;
+        auto& box = *result;
 
-    for (const auto& box_expected : mbmff::box_iterator(file_data_span, mbmff::iterator_flags::recursive)) {
-        if (!box_expected) {
+        switch (box.type()) {
+        case mbmff::box_type::ftyp:
+            std::cout << "ftyp: " << mbmff::box_cast<mbmff::box_type::ftyp>(box).value().major_brand.view() << '\n';
             break;
-        }
-        const auto& box = box_expected.value();
-
-        // Get concrete types
-        switch (box.box_header.type) {
-        case mbmff::box_type::ftyp: {
-            auto ftyp = mbmff::box_cast<mbmff::box_type::ftyp>(box);
-            // Access the contents of the FTYP box using the ftyp variable
-            std::cout << "Found FTYP box!" << std::endl;
-        } break;
+        case mbmff::box_type::hdlr:
+            std::cout << "hdlr: " << mbmff::box_cast<mbmff::box_type::hdlr>(box).value().handler_type.view() << '\n';
+            break;
+        default:
+            break;
         }
     }
 }
 ```
 
-## Consumption
-the library is header only. You can:
+## Requirements
 
-- Copy headers directly
-- Use FetchContent/CPM and consume via CMake
-- Use Conan package manager
+- C++20 compiler (tested with MSVC 2022, GCC 14, Clang 18)
+- C++23 for the test runner (`std::format`)
+
+## Consumption
+
+The library is header-only. Choose your path:
+
+| Method | Instructions |
+|---|---|
+| **Copy headers** | Grab `include/mbmff/` and include `<mbmff/mbmff.hpp>` |
+| **Single header** | `cmake --build build --target amalgamate` → `build/mbmff.hpp` |
+| **CMake** | `add_subdirectory` or `FetchContent` → `target_link_libraries(foo PRIVATE mbmff::mbmff)` |
+| **Conan** | `conan create .` → `requires = "mbmff/1.0.0"` |
+| **Release** | Download single-header release |
 
 ## Project and contribution
 
-I can only work on this project on my free time, but if there is an actual need for a super lean parsing with blazing speeds, for example for Vulkan Video, feel free to extend the library.
+Built in my free time. If you need a lean, fast ISOBMFF parser — for Vulkan Video or anything else — PRs are welcome.
+
+## License
+
+MIT — see [LICENSE.txt](LICENSE.txt).

@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq ninja-build
+
+      - name: Configure
+        run: cmake -B build -G Ninja
+
+      - name: Build (includes constexpr tests)
+        run: cmake --build build
+
+      - name: Run tests on AVIF samples
+        run: |
+          for f in test/assets/*.avif; do
+            echo "=== $f ==="
+            ./build/test/mbmff-test "$f"
+          done

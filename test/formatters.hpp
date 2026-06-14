@@ -1,401 +1,225 @@
 #pragma once
+#include <format>
 #include <string>
 #include <mbmff/mbmff.hpp>
-#include <mbmff/av1.hpp>
-
-template<>
-struct std::formatter<mbmff::obu_sequence_header_view> : std::formatter<std::string_view> {
-    auto format(const mbmff::obu_sequence_header_view& view, std::format_context& ctx) const
-    {
-        auto header = view.header();
-        std::string output = std::format(
-            "obu_sequence_header: seq_profile={}, still_picture={}, reduced_still_picture_header={}, "
-            "timing_info_present_flag={}, decoder_model_info_present_flag={}, "
-            "initial_display_delay_present_flag={}, operating_points_cnt_minus_1={}",
-            uint8_t(header.seq_profile),
-            uint8_t(header.still_picture),
-            uint8_t(header.reduced_still_picture_header),
-            uint8_t(header.timing_info_present_flag),
-            uint8_t(header.decoder_model_info_present_flag),
-            uint8_t(header.initial_display_delay_present_flag),
-            uint8_t(header.operating_points_cnt_minus_1)
-        );
-
-        if (header.operating_points_cnt_minus_1 > 0 || true) {
-            output += "\n  Operating Points:";
-            for (std::uint8_t i = 0; i <= header.operating_points_cnt_minus_1; ++i) {
-                const auto& op = header.operating_points[i];
-                output += std::format(
-                    "\n    [{}] idc={}, level_idx={}, tier={}, decoder_model_present={}, initial_display_delay_present={}",
-                    i, op.operating_point_idc, static_cast<uint32_t>(op.seq_level_idx),
-                    op.seq_tier ? "high" : "main",
-                    static_cast<uint32_t>(op.decoder_model_present_for_this_op),
-                    static_cast<uint32_t>(op.initial_display_delay_present_for_this_op)
-                );
-            }
-        }
-
-        output += std::format("\n  Color Config:");
-        output += std::format("\n    high_bitdepth={}, twelve_bit={}, monochrome={}, color_description_present={}", 
-            static_cast<uint32_t>(header.color_config_data.high_bitdepth),
-            static_cast<uint32_t>(header.color_config_data.twelve_bit),
-            static_cast<uint32_t>(header.color_config_data.monochrome),
-            static_cast<uint32_t>(header.color_config_data.color_description_present_flag)
-        );
-
-        if (header.color_config_data.color_description_present_flag) {
-            const auto& cd = header.color_config_data.color_description_data;
-            output += std::format("\n    color_primaries={}, transfer_characteristics={}, matrix_coefficients={}", 
-                mbmff::to_string(cd.color_primaries),
-                mbmff::to_string(cd.transfer_characteristics),
-                mbmff::to_string(cd.matrix_coefficients)
-            );
-        }
-
-        output += std::format("\n  Frame Max Dimensions: {}x{}",
-            header.max_frame_width_minus_1 + 1,
-            header.max_frame_height_minus_1 + 1
-        );
-
-        return std::formatter<std::string_view>::format(output, ctx);
-    }
-};
 
 //------------------------------------------------------------------------------------------------------------
-template <>
-struct std::formatter<mbmff::any_obu_view> : std::formatter<std::string_view> {
-    auto format(const mbmff::any_obu_view& box, format_context& ctx) const -> format_context::iterator
-    {
-        std::string output = std::format(
-            "OBU: type={}",
-            mbmff::to_string(static_cast<mbmff::obu_type>(box.type))
-        );
-
-        // Add size field if present
-        if (box.has_size_field) {
-            output += std::format(", size_field=1");
-        }
-        
-        // Add extension fields
-        if (box.extension_flag) {
-            output += std::format(
-                ", temporal_id={}, spatial_id={}", 
-                box.temporal_id, 
-                box.spatial_id
-            );
-        }
-
-        output += "}";
-        return std::formatter<std::string_view>::format(output, ctx);
-    }
-};
-
-//------------------------------------------------------------------------------------------------------------
-template <>
-struct std::formatter<mbmff::error_code> : std::formatter<std::string_view> {
-    auto format(mbmff::error_code code, std::format_context& ctx) const
-    {
-        return std::formatter<std::string_view>::format(mbmff::get_error_message(code), ctx);
-    }
-};
-
-template <>
-struct std::formatter<mbmff::box_header> : std::formatter<std::string_view> {
-    auto format(const mbmff::box_header& header, std::format_context& ctx) const
-    {
-        return std::formatter<std::string_view>::format(
-            std::format("{} ({} bytes)", header.type_string().view(), header.size),
-            ctx
-        );
-    }
-};
-
+// ftyp
 template <>
 struct std::formatter<mbmff::ftyp_box> : std::formatter<std::string_view> {
     auto format(const mbmff::ftyp_box& box, std::format_context& ctx) const
     {
-        std::string output = std::format(
-            "FTYP [{} bytes]: {} minor={} compatible=[",
-            box.box_header.size,
-            box.major_brand().view(),
-            box.minor_version()
-        );
-
-        auto compatible_brands = box.compatible_brands();
-
-        for (std::size_t i = 0; i < compatible_brands.size(); ++i) {
-            if (i != 0) {
-                output.append(", ");
-            }
-            output.append(compatible_brands[i].view());
+        auto v = box.value();
+        std::string out;
+        out += std::format(" size=\"{}\" major=\"{}\"", box.size_, v.major_brand.view());
+        out += std::format(" minor=\"{}\" compatible=\"[", v.minor_version);
+        for (std::size_t i = 0; i < v.compatible_brands.size(); ++i) {
+            if (i) out += ',';
+            out += v.compatible_brands[i].view();
         }
-        output.push_back(']');
-        return std::formatter<std::string_view>::format(output, ctx);
+        out += "]\"";
+        return std::formatter<std::string_view>::format(out, ctx);
     }
 };
 
+//------------------------------------------------------------------------------------------------------------
+// meta
 template <>
 struct std::formatter<mbmff::meta_box> : std::formatter<std::string_view> {
     auto format(const mbmff::meta_box& box, std::format_context& ctx) const
     {
         return std::formatter<std::string_view>::format(
-            std::format(
-                "META [{} bytes]: version={} flags=0x{:06X}",
-                box.box_header.size,
-                box.box_header.version,
-                box.box_header.flags_value()
-            ),
+            std::format(" size=\"{}\"", box.size_),
             ctx
         );
     }
 };
 
+//------------------------------------------------------------------------------------------------------------
+// mdat
 template <>
 struct std::formatter<mbmff::mdat_box> : std::formatter<std::string_view> {
     auto format(const mbmff::mdat_box& box, std::format_context& ctx) const
     {
         return std::formatter<std::string_view>::format(
-            std::format("MDAT [{} bytes]: payload={} bytes", box.box_header.size, box.data_size()),
+            std::format(" size=\"{}\" data_size=\"{}\"", box.size_, box.payload.size()),
             ctx
         );
     }
 };
 
+//------------------------------------------------------------------------------------------------------------
+// iinf
 template <>
 struct std::formatter<mbmff::iinf_box> : std::formatter<std::string_view> {
     auto format(const mbmff::iinf_box& box, std::format_context& ctx) const
     {
+        auto v = box.value();
         return std::formatter<std::string_view>::format(
-            std::format(
-                "IINF [{} bytes]: version={} flags=0x{:06X}, entries={}",
-                box.box_header.size,
-                box.box_header.version,
-                box.box_header.flags_value(),
-                box.entry_count()
-            ),
+            std::format(" size=\"{}\" version=\"{}\" entry_count=\"{}\"", box.size_, box.version(), v.entry_count),
             ctx
         );
     }
 };
 
-template <>
-struct std::formatter<mbmff::infe_box> : std::formatter<std::string_view> {
-    auto format(const mbmff::infe_box& box, std::format_context& ctx) const
-    {
-        auto header = box.header();
-        auto version = box.version();
-        std::string output = std::format(
-            "INFE [{} bytes]: version={} id={} protection={}",
-            box.box_header.size,
-            version,
-            header.item_id,
-            header.item_protection_index
-        );
-
-        if (version < 2) {
-            output.append(std::format(" name={}", header.item_name));
-        }
-
-        if (version >= 2) {
-            output.append(std::format(" type={}", header.item_type.view()));
-            if (header.item_type.view() == "mime") {
-                output.append(std::format(" content_type={}", header.content_type));
-                if (!header.content_encoding.empty()) {
-                    output.append(std::format(" content_encoding={}", header.content_encoding));
-                }
-            } else if (header.item_type.view() == "uri ") {
-                output.append(std::format(" uri={}", header.item_uri_type));
-            }
-        }
-
-        return std::formatter<std::string_view>::format(output, ctx);
-    }
-};
-
+//------------------------------------------------------------------------------------------------------------
+// hdlr
 template <>
 struct std::formatter<mbmff::hdlr_box> : std::formatter<std::string_view> {
     auto format(const mbmff::hdlr_box& box, std::format_context& ctx) const
     {
-        auto header = box.header();
-        std::string output = std::format(
-            "HDLR [{} bytes]: handler_type={}",
-            box.box_header.size,
-            header.handler_type.view()
-        );
-        if (!header.name.empty()) {
-            output.append(std::format(" name={}", header.name));
+        auto v = box.value();
+        std::string out = std::format(" size=\"{}\" handler_type=\"{}\"", box.size_, v.handler_type.view());
+        if (!v.name.empty()) {
+            out += std::format(" name=\"{}\"", v.name);
         }
-        return std::formatter<std::string_view>::format(output, ctx);
+        return std::formatter<std::string_view>::format(out, ctx);
     }
 };
 
+//------------------------------------------------------------------------------------------------------------
+// pitm
 template <>
 struct std::formatter<mbmff::pitm_box> : std::formatter<std::string_view> {
     auto format(const mbmff::pitm_box& box, std::format_context& ctx) const
     {
+        auto v = box.value();
         return std::formatter<std::string_view>::format(
-            std::format("PITM [{} bytes]: item_id={}", box.box_header.size, box.item_id()),
+            std::format(" size=\"{}\" item_id=\"{}\"", box.size_, v.item_id),
             ctx
         );
     }
 };
 
-template <>
-struct std::formatter<mbmff::iloc_box> : std::formatter<std::string_view> {
-    auto format(const mbmff::iloc_box& box, std::format_context& ctx) const
-    {
-        auto header = box.header();
-        std::string output = std::format(
-            "ILOC [{} bytes]: version={} offset_size={} length_size={} base_offset_size={} index_size={} item_count={}",
-            box.box_header.size,
-            box.version(),
-            header.offset_size,
-            header.length_size,
-            header.base_offset_size,
-            header.index_size,
-            header.item_count
-        );
-        return std::formatter<std::string_view>::format(output, ctx);
-    }
-};
-
-template <>
-struct std::formatter<mbmff::iprp_box> : std::formatter<std::string_view> {
-    auto format(const mbmff::iprp_box& box, std::format_context& ctx) const
-    {
-        return std::formatter<std::string_view>::format(
-            std::format("IPRP [{} bytes]: Container", box.box_header.size),
-            ctx
-        );
-    }
-};
-
-template <>
-struct std::formatter<mbmff::ipco_box> : std::formatter<std::string_view> {
-    auto format(const mbmff::ipco_box& box, std::format_context& ctx) const
-    {
-        return std::formatter<std::string_view>::format(
-            std::format("IPCO [{} bytes]: Container", box.box_header.size),
-            ctx
-        );
-    }
-};
-
+//------------------------------------------------------------------------------------------------------------
+// ispe
 template <>
 struct std::formatter<mbmff::ispe_box> : std::formatter<std::string_view> {
     auto format(const mbmff::ispe_box& box, std::format_context& ctx) const
     {
-        auto header = box.header();
+        auto v = box.value();
         return std::formatter<std::string_view>::format(
-            std::format(
-                "ISPE [{} bytes]: image_width={} image_height={}",
-                box.box_header.size,
-                header.image_width,
-                header.image_height
-            ),
+            std::format(" size=\"{}\" image_width=\"{}\" image_height=\"{}\"", box.size_, v.image_width, v.image_height),
             ctx
         );
     }
 };
 
-template <>
-struct std::formatter<mbmff::av1C_box> : std::formatter<std::string_view> {
-    auto format(const mbmff::av1C_box& box, std::format_context& ctx) const
-    {
-        auto header = box.header();
-        std::string output = std::format(
-            "AV1C [{} bytes]: profile={} level={} tier={} bitdepth={} monochrome={} chroma_subsampling=({}, {})",
-            box.box_header.size,
-            std::uint8_t(header.seq_profile),
-            std::uint8_t(header.seq_level_idx_0),
-            header.seq_tier_0 ? "high" : "main",
-            header.high_bitdepth ? (header.twelve_bit ? 12 : 10) : 8,
-            header.monochrome ? "yes" : "no",
-            header.chroma_subsampling_x ? "1" : "0",
-            header.chroma_subsampling_y ? "1" : "0"
-        );
-        return std::formatter<std::string_view>::format(output, ctx);
-    }
-};
-
+//------------------------------------------------------------------------------------------------------------
+// pixi
 template <>
 struct std::formatter<mbmff::pixi_box> : std::formatter<std::string_view> {
     auto format(const mbmff::pixi_box& box, std::format_context& ctx) const
     {
-        auto bits = box.bits_per_channel();
-        std::string output = std::format("PIXI [{} bytes]: bits_per_channel=[", box.box_header.size);
-        for (std::size_t i = 0; i < bits.size(); ++i) {
-            if (i != 0) {
-                output.append(", ");
-            }
-            output.append(std::format("{}", bits[i]));
+        auto v = box.value();
+        std::string out = std::format(" size=\"{}\" bits_per_channel=\"[", box.size_);
+        for (std::size_t i = 0; i < v.bits_per_channel.size(); ++i) {
+            if (i) out += ',';
+            out += std::format("{}", v.bits_per_channel[i]);
         }
-        return std::formatter<std::string_view>::format(output.append("]"), ctx);
+        out += "]\"";
+        return std::formatter<std::string_view>::format(out, ctx);
     }
 };
 
-template <>
-struct std::formatter<mbmff::ipma_association> : std::formatter<std::string_view> {
-    auto format(const mbmff::ipma_association& box, std::format_context& ctx) const
-    {
-        return std::formatter<std::string_view>::format(
-            std::format("ipco_property={} essential={}", box.property_index, box.essential ? "yes" : "no"),
-            ctx
-        );
-    }
-};
-
-template <>
-struct std::formatter<mbmff::ipma_entry> : std::formatter<std::string_view> {
-    auto format(const mbmff::ipma_entry& entry, std::format_context& ctx) const
-    {
-        std::string output = std::format("IPMA Entry: item_id={} associations=[", entry.item_id);
-        for (std::size_t i = 0; i < entry.size(); ++i) {
-            if (i != 0) {
-                output.append(", ");
-            }
-            output += std::format("{{ {} }}", entry[i]);
-        }
-        return std::formatter<std::string_view>::format(output.append("]"), ctx);
-    }
-};
-
-template <>
-struct std::formatter<mbmff::iloc_extent> : std::formatter<std::string_view> {
-    auto format(const mbmff::iloc_extent& extent, std::format_context& ctx) const
-    {
-        return std::formatter<std::string_view>::format(
-            std::format("extent(index={} offset={} length={})", extent.index, extent.offset, extent.length),
-            ctx
-        );
-    }
-};
-
-template <>
-struct std::formatter<mbmff::iloc_item> : std::formatter<std::string_view> {
-    auto format(const mbmff::iloc_item& item, std::format_context& ctx) const
-    {
-        std::string output = std::format(
-            "ILOC Item: item_id={} base_offset={} construction_method={} data_reference_index={} extents=[",
-            item.item_id, item.base_offset, item.construction_method, item.data_reference_index
-        );
-        for (std::size_t i = 0; i < item.size(); ++i) {
-            if (i != 0) {
-                output.append(", ");
-            }
-            output += std::format("{}", item[i]);
-        }
-        return std::formatter<std::string_view>::format(output.append("]"), ctx);
-    }
-};
-
+//------------------------------------------------------------------------------------------------------------
+// pasp
 template <>
 struct std::formatter<mbmff::pasp_box> : std::formatter<std::string_view> {
     auto format(const mbmff::pasp_box& box, std::format_context& ctx) const
     {
-        auto [x, y] = box.aspect_ratio();
+        auto v = box.value();
         return std::formatter<std::string_view>::format(
-            std::format("PASP [{} bytes]: aspect_ratio=({}x{})", box.box_header.size, x, y),
+            std::format(" size=\"{}\" h_spacing=\"{}\" v_spacing=\"{}\"", box.size_, v.h_spacing, v.v_spacing),
+            ctx
+        );
+    }
+};
+
+//------------------------------------------------------------------------------------------------------------
+// ipma
+template <>
+struct std::formatter<mbmff::ipma_box> : std::formatter<std::string_view> {
+    auto format(const mbmff::ipma_box& box, std::format_context& ctx) const
+    {
+        auto v = box.value();
+        return std::formatter<std::string_view>::format(
+            std::format(" size=\"{}\" entry_count=\"{}\"", box.size_, v.entry_count),
+            ctx
+        );
+    }
+};
+
+//------------------------------------------------------------------------------------------------------------
+// infe
+template <>
+struct std::formatter<mbmff::infe_box> : std::formatter<std::string_view> {
+    auto format(const mbmff::infe_box& box, std::format_context& ctx) const
+    {
+        auto v = box.value();
+        std::string out = std::format(" size=\"{}\" id=\"{}\" protection=\"{}\"",
+            box.size_, v.item_id, v.item_protection_index);
+        if (!v.item_name.empty()) {
+            out += std::format(" name=\"{}\"", v.item_name);
+        }
+        if (v.item_type.view().size() == 4) {
+            out += std::format(" type=\"{}\"", v.item_type.view());
+        }
+        if (!v.content_type.empty()) {
+            out += std::format(" content_type=\"{}\"", v.content_type);
+        }
+        if (!v.content_encoding.empty()) {
+            out += std::format(" content_encoding=\"{}\"", v.content_encoding);
+        }
+        if (!v.item_uri_type.empty()) {
+            out += std::format(" uri=\"{}\"", v.item_uri_type);
+        }
+        return std::formatter<std::string_view>::format(out, ctx);
+    }
+};
+
+//------------------------------------------------------------------------------------------------------------
+// av1C
+template <>
+struct std::formatter<mbmff::av1C_box> : std::formatter<std::string_view> {
+    auto format(const mbmff::av1C_box& box, std::format_context& ctx) const
+    {
+        auto v = box.value();
+        std::string out = std::format(
+            " size=\"{}\" seq_profile=\"{}\" seq_level_idx_0=\"{}\" seq_tier_0=\"{}\""
+            " high_bitdepth=\"{}\" twelve_bit=\"{}\" monochrome=\"{}\""
+            " chroma_subsampling_x=\"{}\" chroma_subsampling_y=\"{}\""
+            " chroma_sample_position=\"{}\"",
+            box.size_,
+            static_cast<unsigned>(v.seq_profile), static_cast<unsigned>(v.seq_level_idx_0),
+            static_cast<unsigned>(v.seq_tier_0),
+            static_cast<unsigned>(v.high_bitdepth), static_cast<unsigned>(v.twelve_bit),
+            static_cast<unsigned>(v.monochrome),
+            static_cast<unsigned>(v.chroma_subsampling_x), static_cast<unsigned>(v.chroma_subsampling_y),
+            static_cast<unsigned>(v.chroma_sample_position));
+        if (v.initial_presentation_delay_present) {
+            out += std::format(" initial_presentation_delay_minus_one=\"{}\"",
+                static_cast<unsigned>(v.initial_presentation_delay_minus_one));
+        }
+        if (!v.config_obus.empty()) {
+            out += std::format(" config_obus_size=\"{}\"", v.config_obus.size());
+        }
+        return std::formatter<std::string_view>::format(out, ctx);
+    }
+};
+
+//------------------------------------------------------------------------------------------------------------
+// iloc
+template <>
+struct std::formatter<mbmff::iloc_box> : std::formatter<std::string_view> {
+    auto format(const mbmff::iloc_box& box, std::format_context& ctx) const
+    {
+        auto v = box.value();
+        return std::formatter<std::string_view>::format(
+            std::format(" size=\"{}\" version=\"{}\" offset_size=\"{}\" length_size=\"{}\""
+                        " base_offset_size=\"{}\" index_size=\"{}\" item_count=\"{}\"",
+                        box.size_, box.version(),
+                        v.offset_size, v.length_size, v.base_offset_size, v.index_size, v.item_count),
             ctx
         );
     }

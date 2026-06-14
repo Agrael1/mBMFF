@@ -11,15 +11,14 @@ class MBMFFConan(ConanFile):
     topics = ("bmff", "iso-bmff", "media", "header-only")
     settings = "os", "compiler", "build_type", "arch"
 
-    exports_sources = "CMakeLists.txt", "include/*"
+    exports_sources = "CMakeLists.txt", "include/*", "tools/*"
 
     def layout(self):
         cmake_layout(self)
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # Disable building tests for conan package
-        tc.variables["BUILD_TESTING"] = False
+        tc.variables["MBMFF_BUILD_TEST"] = False
         tc.generate()
         deps = CMakeDeps(self)
         deps.generate()
@@ -27,14 +26,13 @@ class MBMFFConan(ConanFile):
     def build(self):
         cmake = CMake(self)
         cmake.configure()
-        cmake.build()
+        cmake.build(target="amalgamate")
 
     def package(self):
         cmake = CMake(self)
         cmake.install()
 
     def package_info(self):
-        # Indicate this is a header-only library
         self.cpp_info.bindirs = []
         self.cpp_info.libdirs = []
 

@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq ninja-build python3
+
+      - name: Configure
+        run: cmake -B build -G Ninja
+
+      - name: Read version
+        id: version
+        run: echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
+
+      - name: Build amalgamated header
+        run: cmake --build build --target amalgamate
+
+      - name: Upload single header
+        uses: actions/upload-artifact@v4
+        with:
+          name: mbmff-single-header
+          path: build/mbmff.hpp
+
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          gh release create "v${VERSION}" \
+            --title "Release v${VERSION}" \
+            --notes "mBMFF single-header release." \
+            --draft \
+            build/mbmff.hpp
