@@ -1,158 +1,208 @@
-#include <filesystem>
+#include <mbmff/mbmff.hpp>
 #include <fstream>
 #include <iostream>
 #include <vector>
 #include "formatters.hpp"
 
-
-
-int main()
+static constexpr auto is_box_implemented(mbmff::box_type type) noexcept -> bool
 {
-    std::ifstream avif_file("assets/avif_sample_8_420.avif", std::ios::binary);
-    if (!avif_file) {
-        std::cerr << "Failed to open the AVIF file.\n";
-        return 1; // Failed to open the file
+    switch (type) {
+    case mbmff::box_type::ftyp:
+    case mbmff::box_type::meta:
+    case mbmff::box_type::mdat:
+    case mbmff::box_type::av1C:
+    case mbmff::box_type::moov:
+    case mbmff::box_type::trak:
+    case mbmff::box_type::mdia:
+    case mbmff::box_type::minf:
+    case mbmff::box_type::stbl:
+    case mbmff::box_type::dinf:
+    case mbmff::box_type::edts:
+    case mbmff::box_type::udta:
+    case mbmff::box_type::mvex:
+    case mbmff::box_type::moof:
+    case mbmff::box_type::traf:
+    case mbmff::box_type::mfra:
+    case mbmff::box_type::ipco:
+    case mbmff::box_type::iprp:
+    case mbmff::box_type::iinf:
+    case mbmff::box_type::iref:
+    case mbmff::box_type::iloc:
+    case mbmff::box_type::hdlr:
+    case mbmff::box_type::pitm:
+    case mbmff::box_type::ispe:
+    case mbmff::box_type::pixi:
+    case mbmff::box_type::pasp:
+    case mbmff::box_type::ipma:
+    case mbmff::box_type::infe:
+        return true;
+    default:
+        return false;
     }
+}
 
-    std::vector<char> file_data((std::istreambuf_iterator<char>(avif_file)), std::istreambuf_iterator<char>());
-    std::span<const std::byte> file_data_span(reinterpret_cast<const std::byte*>(file_data.data()), file_data.size());
-
-    uint32_t primary_item_id = 0;
-    mbmff::iloc_box iloc_box;
-
-    for (const auto& box_expected : mbmff::box_iterator(file_data_span, mbmff::iterator_flags::recursive)) {
-        if (!box_expected) {
+static auto display_fourcc(const mbmff::fourcc_string& fc) -> std::string
+{
+    std::string out;
+    out.reserve(12);
+    bool all_printable = true;
+    for (std::size_t i = 0; i < 4; ++i) {
+        auto c = fc[i];
+        if (static_cast<unsigned char>(c) < 0x20 || static_cast<unsigned char>(c) > 0x7e) {
+            all_printable = false;
             break;
         }
-        const auto& box = box_expected.value();
+    }
+    if (all_printable) {
+        out.append(fc.view());
+    } else {
+        out += '[';
+        for (std::size_t i = 0; i < 4; ++i) {
+            if (i) out += ' ';
+            auto uc = static_cast<unsigned char>(fc[i]);
+            auto hex = "0123456789abcdef";
+            out += "0x";
+            out += hex[uc >> 4];
+            out += hex[uc & 0xf];
+        }
+        out += ']';
+    }
+    return out;
+}
 
-        // Get concrete types
-        switch (box.box_header.type) {
-        case mbmff::box_type::ftyp: {
-            auto ftyp = mbmff::box_cast<mbmff::box_type::ftyp>(box);
-            std::cout << std::format("{}\n", ftyp);
-        } break;
-        case mbmff::box_type::infe: {
-            auto infe = mbmff::box_cast<mbmff::box_type::infe>(box);
-            std::cout << std::format("{}\n", infe);
-        } break;
-        case mbmff::box_type::meta: {
-            auto meta = mbmff::box_cast<mbmff::box_type::meta>(box);
-            std::cout << std::format("{}\n", meta);
-        } break;
-        case mbmff::box_type::hdlr: {
-            auto hdlr = mbmff::box_cast<mbmff::box_type::hdlr>(box);
-            std::cout << std::format("{}\n", hdlr);
-        } break;
-        case mbmff::box_type::pitm: {
-            auto pitm = mbmff::box_cast<mbmff::box_type::pitm>(box);
-            std::cout << std::format("{}\n", pitm);
-            primary_item_id = pitm.item_id();
-        } break;
-        case mbmff::box_type::iinf: {
-            auto iinf = mbmff::box_cast<mbmff::box_type::iinf>(box);
-            std::cout << std::format("{}\n", iinf);
-        } break;
-        case mbmff::box_type::iloc: {
-            auto iloc = mbmff::box_cast<mbmff::box_type::iloc>(box);
-            std::cout << std::format("{}\n", iloc);
-            iloc_box = iloc;
-        } break;
-        case mbmff::box_type::iprp: {
-            auto iprp = mbmff::box_cast<mbmff::box_type::iprp>(box);
-            std::cout << std::format("{}\n", iprp);
-        } break;
-        case mbmff::box_type::ipco: {
-            auto ipco = mbmff::box_cast<mbmff::box_type::ipco>(box);
-            std::cout << std::format("{}\n", ipco);
-        } break;
-        case mbmff::box_type::mdat: {
-            auto mdat = mbmff::box_cast<mbmff::box_type::mdat>(box);
-            std::cout << std::format("{}\n", mdat);
-        } break;
-        case mbmff::box_type::ispe: {
-            auto ispe = mbmff::box_cast<mbmff::box_type::ispe>(box);
-            std::cout << std::format("{}\n", ispe);
-        } break;
-        case mbmff::box_type::av1C: {
-            auto av1C = mbmff::box_cast<mbmff::box_type::av1C>(box);
-            std::cout << std::format("{}\n", av1C);
+static void print_box(const mbmff::any_box_view& box, std::size_t depth)
+{
+    for (std::size_t i = 0; i < depth; ++i) std::cout << "  ";
 
-            // scan OBUs in the av1C payload
-            for (std::uint32_t i = 0; const auto& obu : mbmff::av1::obu_iterator(av1C.header())) {
-                if (!obu) {
-                    std::cout << std::format(
-                        "    OBU parsing error: code={}, needed={}\n",
-                        obu.error().code,
-                        obu.error().needed
-                    );
-                    break;
+    if (!is_box_implemented(box.type_)) {
+        std::cout << "\x1b[33m[!]\x1b[0m ";
+    }
+
+    std::cout << '<' << display_fourcc(box.type_string());
+
+    switch (box.type_) {
+    case mbmff::box_type::ftyp:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::ftyp>(box));
+        break;
+    case mbmff::box_type::meta:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::meta>(box));
+        break;
+    case mbmff::box_type::mdat:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::mdat>(box));
+        break;
+    case mbmff::box_type::iinf:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::iinf>(box));
+        break;
+    case mbmff::box_type::iloc:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::iloc>(box));
+        break;
+    case mbmff::box_type::hdlr:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::hdlr>(box));
+        break;
+    case mbmff::box_type::pitm:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::pitm>(box));
+        break;
+    case mbmff::box_type::ispe:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::ispe>(box));
+        break;
+    case mbmff::box_type::pixi:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::pixi>(box));
+        break;
+    case mbmff::box_type::pasp:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::pasp>(box));
+        break;
+    case mbmff::box_type::ipma:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::ipma>(box));
+        break;
+    case mbmff::box_type::infe:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::infe>(box));
+        break;
+    case mbmff::box_type::av1C:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::av1C>(box));
+        break;
+    default:
+        std::cout << " size=\"" << box.size_ << '"';
+        break;
+    }
+
+    bool is_container = mbmff::has(mbmff::get_box_properties(box.type_), mbmff::box_properties::container);
+    std::cout << (is_container ? ">" : " />") << '\n';
+
+    if (box.type_ == mbmff::box_type::iloc) {
+        auto iloc = mbmff::box_cast<mbmff::box_type::iloc>(box);
+        auto data = iloc.value();
+        auto iter = mbmff::iloc_item_iterator(data, iloc.version());
+        for (; iter != mbmff::iloc_item_iterator{}; ++iter) {
+            auto item = *iter;
+            for (std::size_t i = 0; i < depth + 1; ++i) std::cout << "  ";
+            std::cout << std::format("<item id=\"{}\" base_offset=\"{}\" construction_method=\"{}\""
+                                     " data_reference_index=\"{}\" extents=\"{}\">\n",
+                                     item.item_id, item.base_offset,
+                                     item.construction_method, item.data_reference_index, item.size());
+            for (std::size_t e = 0; e < item.size(); ++e) {
+                auto ext = item[e];
+                for (std::size_t i = 0; i < depth + 2; ++i) std::cout << "  ";
+                std::cout << std::format("<extent offset=\"{}\" length=\"{}\"", ext.offset, ext.length);
+                if (ext.index) {
+                    std::cout << std::format(" index=\"{}\"", ext.index);
                 }
-
-                if (obu->type == mbmff::av1::obu_type::sequence_header) {
-                    auto seq_header_obu = mbmff::av1::obu_cast<mbmff::av1::obu_type::sequence_header>(*obu);
-                    std::cout << std::format("    Sequence Header OBU: {}\n", seq_header_obu);
-                    break;
-                }
-
-                std::cout << std::format("    {}:{}\n", i++, obu.value());
+                std::cout << " />\n";
             }
+            for (std::size_t i = 0; i < depth + 1; ++i) std::cout << "  ";
+            std::cout << "</item>\n";
+        }
+    }
+}
 
-        } break;
-        case mbmff::box_type::pixi: {
-            auto pixi = mbmff::box_cast<mbmff::box_type::pixi>(box);
-            std::cout << std::format("{}\n", pixi);
-        } break;
-        case mbmff::box_type::ipma: {
-            auto ipma = mbmff::box_cast<mbmff::box_type::ipma>(box);
-            // ipma doesn't have a custom formatter, because we need to intrude into its payload to parse the actual
-            // entries, so we print it manually here
-
-            for (auto entry : mbmff::ipma_entry_iterator(ipma)) {
-                std::cout << std::format("{}\n", entry);
+static void walk_boxes_impl(const mbmff::any_box_view& box, std::size_t depth)
+{
+    print_box(box, depth);
+    auto props = mbmff::get_box_properties(box.type_);
+    if (mbmff::has(props, mbmff::box_properties::container) && !box.payload.empty()) {
+        for (const auto& child : mbmff::box_iterator(box.payload)) {
+            if (!child) {
+                std::cerr << "\x1b[31;1m" << std::string(depth * 2, ' ')
+                          << "Parse error: " << mbmff::to_string(child.code)
+                          << " (needed " << child.needed << " bytes)\x1b[0m\n";
+                return;
             }
-        } break;
-        case mbmff::box_type::pasp: {
-            auto pasp = mbmff::box_cast<mbmff::box_type::pasp>(box);
-            std::cout << std::format("{}\n", pasp);
-        } break;
-        default:
-            std::cout << "Box type: " << box.box_header.type_string().view() << ", size: " << box.box_header.size
-                      << '\n';
-            break;
+            walk_boxes_impl(*child, depth + 1);
         }
     }
+}
 
-    // parse iloc box to find the offset and size of the primary item in the mdat box
-    uint64_t item_data_offset = 0;
-    uint64_t item_data_size = 0;
-    for (const auto& item : mbmff::iloc_item_iterator(iloc_box)) {
-        if (item.item_id == primary_item_id) {
-            std::cout << std::format(
-                "Primary item found in iloc box: {}\n",
-                item
-            );
-            item_data_offset = item.base_offset;
-            item_data_size = item[0].length;
-            break;
+static void walk_boxes(std::span<const std::byte> data)
+{
+    for (const auto& result : mbmff::box_iterator(data)) {
+        if (!result) {
+            std::cerr << "\x1b[31;1mParse error at top level: "
+                      << mbmff::to_string(result.code)
+                      << " (needed " << result.needed << " bytes)\x1b[0m\n";
+            return;
         }
+        walk_boxes_impl(*result, 0);
+    }
+}
+
+int main(int argc, char* argv[])
+{
+    if (argc < 2) {
+        std::cerr << "Usage: mbmff-test <file>\n";
+        return 1;
     }
 
-    // Seek to the primary item in the mdat box and print the first few bytes of its data
-    auto primary_item_span = file_data_span.subspan(item_data_offset, item_data_size);
-    auto primary_obu = mbmff::av1::obu_iterator(primary_item_span);
-
-    for (std::uint32_t i = 0; const auto& obu : primary_obu) {
-        if (!obu) {
-            std::cout << std::format(
-                "Primary item OBU parsing error: code={}, needed={}\n",
-                obu.error().code,
-                obu.error().needed
-            );
-            break;
-        }
-        std::cout << std::format("Primary item OBU {}: {}\n", i++, obu.value());
+    std::ifstream file(argv[1], std::ios::binary);
+    if (!file) {
+        std::cerr << "Failed to open file: " << argv[1] << '\n';
+        return 1;
     }
 
+    std::vector<char> file_data((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    std::span<const std::byte> file_span(
+        reinterpret_cast<const std::byte*>(file_data.data()),
+        file_data.size()
+    );
+
+    walk_boxes(file_span);
     return 0;
 }
