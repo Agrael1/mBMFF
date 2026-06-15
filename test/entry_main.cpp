@@ -35,6 +35,7 @@ static constexpr auto is_box_implemented(mbmff::box_type type) noexcept -> bool
     case mbmff::box_type::pasp:
     case mbmff::box_type::ipma:
     case mbmff::box_type::infe:
+    case mbmff::box_type::mvhd:
         return true;
     default:
         return false;
@@ -119,6 +120,9 @@ static void print_box(const mbmff::any_box_view& box, std::size_t depth)
         break;
     case mbmff::box_type::av1C:
         std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::av1C>(box));
+        break;
+    case mbmff::box_type::mvhd:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::mvhd>(box));
         break;
     default:
         std::cout << " size=\"" << box.size_ << '"';

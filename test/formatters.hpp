@@ -209,6 +209,22 @@ struct std::formatter<mbmff::av1C_box> : std::formatter<std::string_view> {
 };
 
 //------------------------------------------------------------------------------------------------------------
+// mvhd
+template <>
+struct std::formatter<mbmff::mvhd_box> : std::formatter<std::string_view> {
+    auto format(const mbmff::mvhd_box& box, std::format_context& ctx) const
+    {
+        auto v = box.value();
+        std::string out = std::format(
+            " size=\"{}\" version=\"{}\" creation_time=\"{}\" modification_time=\"{}\""
+            " timescale=\"{}\" duration=\"{}\" rate=\"{}\" volume=\"{}\" next_track_id=\"{}\"",
+            box.size_, box.version(), v.creation_time, v.modification_time,
+            v.timescale, v.duration, v.rate, v.volume, v.next_track_id);
+        return std::formatter<std::string_view>::format(out, ctx);
+    }
+};
+
+//------------------------------------------------------------------------------------------------------------
 // iloc
 template <>
 struct std::formatter<mbmff::iloc_box> : std::formatter<std::string_view> {

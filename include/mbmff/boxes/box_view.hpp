@@ -30,7 +30,8 @@
     MACRO(pixi)                        \
     MACRO(ipma)                        \
     MACRO(pasp)                        \
-    MACRO(infe)
+    MACRO(infe)                        \
+    MACRO(mvhd)
 
 #define MBMFF_FLAG_OPERATORS(EnumType)                                                   \
     constexpr auto operator|(EnumType a, EnumType b) noexcept -> EnumType                \

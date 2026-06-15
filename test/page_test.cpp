@@ -38,6 +38,7 @@ static constexpr bool is_box_implemented(mbmff::box_type type) noexcept
     case mbmff::box_type::pasp:
     case mbmff::box_type::ipma:
     case mbmff::box_type::infe:
+    case mbmff::box_type::mvhd:
         return true;
     default:
         return false;
@@ -67,6 +68,7 @@ static void print_box_info(const mbmff::any_box_view& box, std::size_t depth)
     std::cout << (is_container(box) ? ">" : " />") << '\n';
 }
 
+static void walk_box(const mbmff::any_box_view& box, std::size_t depth);
 static void walk_children(std::span<const std::byte> data, std::size_t depth)
 {
     for (const auto& result : mbmff::box_iterator(data, mbmff::iterator_flags::allow_partial)) {
@@ -80,11 +82,7 @@ static void walk_children(std::span<const std::byte> data, std::size_t depth)
             }
             return;
         }
-        auto& box = *result;
-        print_box_info(box, depth);
-        if (is_container(box) && !box.payload.empty()) {
-            walk_children(box.payload, depth + 1);
-        }
+        walk_box(*result, depth);
     }
 }
 
@@ -101,20 +99,14 @@ static void walk_box(const mbmff::any_box_view& box, std::size_t depth)
 // Tracks the absolute file position of buf_[0].
 // ---------------------------------------------------------------------------
 struct growing_reader {
-    std::ifstream& file_;
+    std::ifstream file_;
     std::vector<std::byte> buf_;
     std::size_t file_offset_ = 0; // absolute file position of buf_[0]
-
-    explicit growing_reader(std::ifstream& file)
-        : file_(file)
-    {}
-
-    void init()
+public:
+    explicit growing_reader(std::ifstream&& file)
+        : file_(std::move(file))
     {
-        file_offset_ = static_cast<std::size_t>(file_.tellg());
-        buf_.resize(page_size);
-        file_.read(reinterpret_cast<char*>(buf_.data()), page_size);
-        buf_.resize(static_cast<std::size_t>(file_.gcount()));
+        reset();
     }
 
     bool ensure(std::size_t needed)
@@ -136,12 +128,25 @@ struct growing_reader {
         file_.seekg(static_cast<std::streamoff>(abs_pos));
         file_offset_ = abs_pos;
         buf_.clear();
-        init();
+        reset();
     }
 
     std::span<const std::byte> span() const
     {
         return std::span(buf_);
+    }
+
+    bool is_empty() const
+    {
+        return buf_.empty();
+    }
+
+    void reset()
+    {
+        file_offset_ = static_cast<std::size_t>(file_.tellg());
+        buf_.resize(page_size);
+        file_.read(reinterpret_cast<char*>(buf_.data()), page_size);
+        buf_.resize(static_cast<std::size_t>(file_.gcount()));
     }
 };
 
@@ -228,9 +233,8 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    growing_reader reader(file);
-    reader.init();
-    if (reader.span().empty()) {
+    growing_reader reader(std::move(file));
+    if (reader.is_empty()) {
         return 0;
     }
 

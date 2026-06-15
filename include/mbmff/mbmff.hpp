@@ -11,6 +11,7 @@
 #include "boxes/ispe.hpp"
 #include "boxes/mdat.hpp"
 #include "boxes/meta.hpp"
+#include "boxes/mvhd.hpp"
 #include "boxes/pasp.hpp"
 #include "boxes/pitm.hpp"
 #include "boxes/pixi.hpp"
