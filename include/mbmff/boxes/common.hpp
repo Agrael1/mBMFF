@@ -11,6 +11,7 @@ enum class error_code {
     success = 0,
     invalid_format,
     need_more_data,
+    truncated,
 };
 
 //------------------------------------------------------------------------------------------------------------
@@ -23,6 +24,8 @@ static constexpr auto to_string(mbmff::error_code code) noexcept -> std::string_
         return "Invalid format";
     case mbmff::error_code::need_more_data:
         return "Need more data";
+    case mbmff::error_code::truncated:
+        return "Truncated";
     default:
         return "Unknown error code";
     }
@@ -71,6 +74,12 @@ template <typename Type>
 constexpr auto make_result(Type value) noexcept -> mbmff::result<Type>
 {
     return {value};
+}
+
+template <typename Type>
+constexpr auto make_result(Type value, mbmff::error_code code) noexcept -> mbmff::result<Type>
+{
+    return {value, code};
 }
 
 //------------------------------------------------------------------------------------------------------------
@@ -174,9 +183,9 @@ constexpr auto read_be(std::span<const std::byte> data) noexcept -> T
             value <<= 8;
             value |= static_cast<T>(data[i]);
         }
-    } else {
-        std::memcpy(&value, data.data(), sizeof(value));
+        return value;
     }
+    std::memcpy(&value, data.data(), sizeof(value));
     return mbmff::byteswap(value);
 }
 

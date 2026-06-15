@@ -182,10 +182,10 @@ static_assert(
 static_assert(
     []() {
         std::array<std::byte, 8> data{
+            std::byte(0),
+            std::byte(0),
+            std::byte(0),
             std::byte(12), // size = 12
-            std::byte(0),
-            std::byte(0),
-            std::byte(0),
             std::byte('m'),
             std::byte('d'),
             std::byte('a'),
