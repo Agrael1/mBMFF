@@ -42,9 +42,29 @@ inline constexpr auto get_box_properties(mbmff::box_type type) noexcept -> mbmff
 #undef MBMFF_CASE_PROP
 }
 
+inline constexpr bool is_box_implemented(mbmff::box_type type) noexcept
+{
+#define MBMFF_CASE_IMPL(name) \
+case mbmff::box_type::name:
+
+    switch (type) {
+        MBMFF_ITERATE_BOX_TYPES(MBMFF_CASE_IMPL)
+        return true;
+    default:
+        return false;
+    }
+#undef MBMFF_CASE_IMPL
+}
+
+inline constexpr bool is_container(const mbmff::any_box_view& box) noexcept
+{
+    return mbmff::has(mbmff::get_box_properties(box.type()), mbmff::box_properties::container);
+}
+
+
+template <mbmff::iterator_flags flags = mbmff::iterator_flags::none>
 inline constexpr auto parse(
-    std::span<const std::byte> data,
-    mbmff::iterator_flags flags = mbmff::iterator_flags::none
+    std::span<const std::byte> data
 ) noexcept -> mbmff::result<mbmff::any_box_view>
 {
     auto header_result = mbmff::parse_box_header(data);
@@ -58,7 +78,7 @@ inline constexpr auto parse(
     std::size_t payload_size;
 
     if (header.size() != 0 && data.size() < header.size()) {
-        if (!mbmff::has(flags, mbmff::iterator_flags::allow_partial)) {
+        if constexpr (!mbmff::has(flags, mbmff::iterator_flags::allow_partial)) {
             return mbmff::make_result<mbmff::any_box_view>(
                 mbmff::error_code::need_more_data,
                 static_cast<std::size_t>(header.size())
@@ -107,55 +127,54 @@ constexpr auto box_cast(const mbmff::any_box_view& box) noexcept -> mbmff::basic
     return static_cast<mbmff::basic_box_view<Box>>(box);
 }
 
-struct box_iterator {
+template <mbmff::iterator_flags flags = mbmff::iterator_flags::none>
+    struct box_iterator {
     using iterator_category = std::forward_iterator_tag;
     using value_type = mbmff::result<mbmff::any_box_view>;
     using difference_type = std::ptrdiff_t;
+    using iterator = mbmff::box_iterator<flags>;
 
 private:
     std::span<const std::byte> remaining_;
-    mbmff::iterator_flags flags_ = mbmff::iterator_flags::none;
 
 public:
     constexpr box_iterator() noexcept = default;
     constexpr explicit box_iterator(
-        std::span<const std::byte> data,
-        mbmff::iterator_flags flags = mbmff::iterator_flags::none
+        std::span<const std::byte> data
     ) noexcept
         : remaining_(data)
-        , flags_(flags)
     {}
 
 public:
-    constexpr auto begin() const noexcept -> mbmff::box_iterator
+    constexpr auto begin() const noexcept -> iterator
     {
         return *this;
     }
-    constexpr auto end() const noexcept -> mbmff::box_iterator
+    constexpr auto end() const noexcept -> iterator
     {
         return {};
     }
     constexpr auto try_get() const noexcept -> mbmff::result<mbmff::any_box_view>
     {
-        return mbmff::parse(remaining_, flags_);
+        return mbmff::parse<flags>(remaining_);
     }
     constexpr auto operator*() const noexcept -> mbmff::result<mbmff::any_box_view>
     {
         return try_get();
     }
-    constexpr auto operator++() noexcept -> mbmff::box_iterator&
+    constexpr auto operator++() noexcept -> iterator&
     {
         if (remaining_.empty()) {
             remaining_ = {};
             return *this;
         }
-        auto op_result = mbmff::parse(remaining_, flags_);
+        auto op_result = mbmff::parse<flags>(remaining_);
         if (!op_result && op_result.code != mbmff::error_code::truncated) {
             remaining_ = {};
             return *this;
         }
 
-        if (mbmff::has(flags_, mbmff::iterator_flags::recursive)) {
+        if constexpr (mbmff::has(flags, mbmff::iterator_flags::recursive)) {
             auto properties = mbmff::get_box_properties(op_result->type_);
             if (mbmff::has(properties, mbmff::box_properties::container)) {
                 auto* payload_start = op_result->payload.data();
@@ -178,13 +197,13 @@ public:
         }
         return *this;
     }
-    constexpr auto operator++(int) noexcept -> mbmff::box_iterator
+    constexpr auto operator++(int) noexcept -> iterator
     {
         auto tmp = *this;
         ++(*this);
         return tmp;
     }
-    constexpr bool operator==(const mbmff::box_iterator& other) const noexcept
+    constexpr bool operator==(const iterator& other) const noexcept
     {
         if (remaining_.empty() && other.remaining_.empty()) {
             return true;
@@ -192,6 +211,10 @@ public:
         return remaining_.data() == other.remaining_.data() && remaining_.size() == other.remaining_.size();
     }
 };
+
+using recursive_box_iterator = mbmff::box_iterator<mbmff::iterator_flags::recursive>;
+using partial_box_iterator = mbmff::box_iterator<mbmff::iterator_flags::allow_partial>;
+
 
 #ifdef MBMFF_ENABLE_CONSTEXPR_TEST
 
@@ -201,8 +224,8 @@ static_assert([] {
         std::byte{0x00}, std::byte{0x00}, std::byte{0x03}, std::byte{0xE8},
         std::byte{'m'}, std::byte{'d'}, std::byte{'a'}, std::byte{'t'},
     };
-    auto r = parse(std::span<const std::byte>(data));
-    return !r && r.code == error_code::need_more_data && r.needed == 1000;
+    auto r = mbmff::parse(std::span<const std::byte>(data));
+    return !r && r.code == mbmff::error_code::need_more_data && r.needed == 1000;
 }());
 
 // parse() with allow_partial returns truncated for incomplete box
@@ -217,8 +240,8 @@ static_assert([] {
         std::byte{'a'},
         std::byte{'t'},
     };
-    auto r = parse(std::span<const std::byte>(data), iterator_flags::allow_partial);
-    return !r && r.code == error_code::truncated && r->type_ == box_type::mdat && r->size_ == 1000
+    auto r = mbmff::parse<mbmff::iterator_flags::allow_partial>(std::span<const std::byte>(data));
+    return !r && r.code == mbmff::error_code::truncated && r->type_ == mbmff::box_type::mdat && r->size_ == 1000
         && r->payload.size() == 4;
 }());
 
@@ -238,8 +261,10 @@ static_assert([] {
         std::byte{0x03},
         std::byte{0x04},
     };
-    auto r = parse(std::span<const std::byte>(data), iterator_flags::allow_partial);
-    return r && r.code == error_code::success && r->type_ == box_type::mdat;
+    auto r = mbmff::parse<mbmff::iterator_flags::allow_partial>(
+        std::span<const std::byte>(data)
+    );
+    return r && r.code == mbmff::error_code::success && r->type_ == mbmff::box_type::mdat;
 }());
 
 // allow_partial still rejects when even the validate minimum is absent
@@ -258,8 +283,8 @@ static_assert([] {
         std::byte{'0'},
         std::byte{'1'},
     };
-    auto r = parse(std::span<const std::byte>(data), iterator_flags::allow_partial);
-    return !r && r.code == error_code::need_more_data && r.needed == 8;
+    auto r = mbmff::parse<mbmff::iterator_flags::allow_partial>(std::span<const std::byte>(data));
+    return !r && r.code == mbmff::error_code::need_more_data && r.needed == 8;
 }());
 
 // box_iterator with allow_partial continues past truncated boxes
@@ -270,14 +295,16 @@ static_assert([] {
         std::byte{0x00}, std::byte{0x00}, std::byte{0x03}, std::byte{0xE8}, std::byte{'m'},  std::byte{'o'},
         std::byte{'o'},  std::byte{'v'},  std::byte{0xAA}, std::byte{0xBB}, std::byte{0xCC}, std::byte{0xDD},
     };
-    auto it = box_iterator(std::span<const std::byte>(data), iterator_flags::allow_partial);
-    auto end = box_iterator{};
+    auto it = mbmff::box_iterator<mbmff::iterator_flags::allow_partial>(
+        std::span<const std::byte>(data)
+    );
+    auto end = it.end();
 
     if (it == end) {
         return false;
     }
     auto r1 = *it;
-    if (!r1 || r1->type_ != box_type::mdat) {
+    if (!r1 || r1->type_ != mbmff::box_type::mdat) {
         return false;
     }
     ++it;
@@ -286,7 +313,7 @@ static_assert([] {
         return false;
     }
     auto r2 = *it;
-    if (r2.code != error_code::truncated || r2->type_ != box_type::moov) {
+    if (r2.code != mbmff::error_code::truncated || r2->type_ != mbmff::box_type::moov) {
         return false;
     }
     ++it;
@@ -303,8 +330,8 @@ static_assert([] {
         std::byte{'m'}, std::byte{'o'}, std::byte{'o'}, std::byte{'v'},
         std::byte{0xAA}, std::byte{0xBB}, std::byte{0xCC}, std::byte{0xDD},
     };
-    auto it = box_iterator(std::span<const std::byte>(data));
-    auto end = box_iterator{};
+    auto it = mbmff::box_iterator(std::span<const std::byte>(data));
+    auto end = it.end();
 
     if (it == end) return false;
     if (!(*it)) return false;  // mdat
@@ -312,7 +339,9 @@ static_assert([] {
 
     // truncated moov — parse fails → iterator terminates
     if (it == end) return false;
-    if ((*it).code != error_code::need_more_data) return false;
+    if ((*it).code != mbmff::error_code::need_more_data) {
+        return false;
+    }
     ++it;
 
     return it == end;
@@ -325,13 +354,16 @@ static_assert([] {
         std::byte{0x00}, std::byte{0x0C}, std::byte{'m'},  std::byte{'d'},  std::byte{'a'},
         std::byte{'t'},  std::byte{0x01}, std::byte{0x02}, std::byte{0x03}, std::byte{0x04},
     };
-    auto it = box_iterator(std::span<const std::byte>(data), iterator_flags::allow_partial | iterator_flags::recursive);
-    auto end = box_iterator{};
+    auto it = mbmff::box_iterator<mbmff::iterator_flags::allow_partial | mbmff::iterator_flags::recursive>(
+        std::span<const std::byte>(data)
+        
+    );
+    auto end = it.end();
 
     if (it == end) {
         return false;
     }
-    if ((*it).code != error_code::truncated || (*it)->type_ != box_type::moov) {
+    if ((*it).code != mbmff::error_code::truncated || (*it)->type_ != mbmff::box_type::moov) {
         return false;
     }
     ++it;
@@ -339,7 +371,7 @@ static_assert([] {
     if (it == end) {
         return false;
     }
-    if (!(*it) || (*it)->type_ != box_type::mdat) {
+    if (!(*it) || (*it)->type_ != mbmff::box_type::mdat) {
         return false;
     }
     ++it;

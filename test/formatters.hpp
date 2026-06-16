@@ -240,3 +240,138 @@ struct std::formatter<mbmff::iloc_box> : std::formatter<std::string_view> {
         );
     }
 };
+
+//------------------------------------------------------------------------------------------------------------
+// Display fourcc as string if printable, otherwise as hex
+static auto display_fourcc(const mbmff::fourcc_string& fc) -> std::string
+{
+    std::string out;
+    out.reserve(12);
+    bool all_printable = true;
+    for (std::size_t i = 0; i < 4; ++i) {
+        auto c = fc[i];
+        if (static_cast<unsigned char>(c) < 0x20 || static_cast<unsigned char>(c) > 0x7e) {
+            all_printable = false;
+            break;
+        }
+    }
+    if (all_printable) {
+        out.append(fc.view());
+    } else {
+        out += '[';
+        for (std::size_t i = 0; i < 4; ++i) {
+            if (i) {
+                out += ' ';
+            }
+            auto uc = static_cast<unsigned char>(fc[i]);
+            auto hex = "0123456789abcdef";
+            out += "0x";
+            out += hex[uc >> 4];
+            out += hex[uc & 0xf];
+        }
+        out += ']';
+    }
+    return out;
+}
+
+//------------------------------------------------------------------------------------------------------------
+// Print box information with indentation based on depth
+static void print_box(const mbmff::any_box_view& box, std::size_t depth)
+{
+    for (std::size_t i = 0; i < depth; ++i) {
+        std::cout << "  ";
+    }
+
+    if (!mbmff::is_box_implemented(box.type_)) {
+        std::cout << "\x1b[33m[!]\x1b[0m ";
+    }
+
+    std::cout << '<' << display_fourcc(box.type_string());
+
+    switch (box.type_) {
+    case mbmff::box_type::ftyp:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::ftyp>(box));
+        break;
+    case mbmff::box_type::meta:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::meta>(box));
+        break;
+    case mbmff::box_type::mdat:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::mdat>(box));
+        break;
+    case mbmff::box_type::iinf:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::iinf>(box));
+        break;
+    case mbmff::box_type::iloc:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::iloc>(box));
+        break;
+    case mbmff::box_type::hdlr:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::hdlr>(box));
+        break;
+    case mbmff::box_type::pitm:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::pitm>(box));
+        break;
+    case mbmff::box_type::ispe:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::ispe>(box));
+        break;
+    case mbmff::box_type::pixi:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::pixi>(box));
+        break;
+    case mbmff::box_type::pasp:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::pasp>(box));
+        break;
+    case mbmff::box_type::ipma:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::ipma>(box));
+        break;
+    case mbmff::box_type::infe:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::infe>(box));
+        break;
+    case mbmff::box_type::av1C:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::av1C>(box));
+        break;
+    case mbmff::box_type::mvhd:
+        std::cout << std::format("{}", mbmff::box_cast<mbmff::box_type::mvhd>(box));
+        break;
+    default:
+        std::cout << " size=\"" << box.size_ << '"';
+        break;
+    }
+
+    bool is_container = mbmff::is_container(box);
+    std::cout << (is_container ? ">" : " />") << '\n';
+
+    if (box.type_ == mbmff::box_type::iloc) {
+        auto iloc = mbmff::box_cast<mbmff::box_type::iloc>(box);
+        auto data = iloc.value();
+        auto iter = mbmff::iloc_item_iterator(data, iloc.version());
+        for (; iter != mbmff::iloc_item_iterator{}; ++iter) {
+            auto item = *iter;
+            for (std::size_t i = 0; i < depth + 1; ++i) {
+                std::cout << "  ";
+            }
+            std::cout << std::format(
+                "<item id=\"{}\" base_offset=\"{}\" construction_method=\"{}\""
+                " data_reference_index=\"{}\" extents=\"{}\">\n",
+                item.item_id,
+                item.base_offset,
+                item.construction_method,
+                item.data_reference_index,
+                item.size()
+            );
+            for (std::size_t e = 0; e < item.size(); ++e) {
+                auto ext = item[e];
+                for (std::size_t i = 0; i < depth + 2; ++i) {
+                    std::cout << "  ";
+                }
+                std::cout << std::format("<extent offset=\"{}\" length=\"{}\"", ext.offset, ext.length);
+                if (ext.index) {
+                    std::cout << std::format(" index=\"{}\"", ext.index);
+                }
+                std::cout << " />\n";
+            }
+            for (std::size_t i = 0; i < depth + 1; ++i) {
+                std::cout << "  ";
+            }
+            std::cout << "</item>\n";
+        }
+    }
+}
