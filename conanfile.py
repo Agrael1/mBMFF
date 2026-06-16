@@ -3,7 +3,7 @@ from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
 
 class MBMFFConan(ConanFile):
     name = "mbmff"
-    version = "1.0.0"
+    version = "0.1.1"
     license = "MIT"
     author = "Agrael1"
     url = "https://github.com/Agrael1/mBMFF"
