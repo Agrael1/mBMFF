@@ -9,13 +9,13 @@ struct ftyp_data {
 };
 
 template <>
-struct basic_box_view<box_type::ftyp> : public mbmff::box_view_base {
-    constexpr static box_properties properties = box_properties::none;
+struct mbmff::basic_box_view<mbmff::box_type::ftyp> : public mbmff::box_view_base {
+    constexpr static mbmff::box_properties properties = mbmff::box_properties::none;
     constexpr static auto validate(mbmff::any_box_view box) noexcept -> mbmff::result<mbmff::any_box_view>;
     constexpr auto value() const noexcept -> mbmff::ftyp_data;
 };
 
-inline constexpr auto mbmff::basic_box_view<box_type::ftyp>::validate(mbmff::any_box_view box) noexcept
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::ftyp>::validate(mbmff::any_box_view box) noexcept
     -> mbmff::result<mbmff::any_box_view>
 {
     if (box.payload.size() < 8) {
@@ -29,29 +29,29 @@ inline constexpr auto mbmff::basic_box_view<box_type::ftyp>::validate(mbmff::any
     return {box};
 }
 
-constexpr auto mbmff::basic_box_view<box_type::ftyp>::value() const noexcept -> mbmff::ftyp_data
+constexpr auto mbmff::basic_box_view<mbmff::box_type::ftyp>::value() const noexcept -> mbmff::ftyp_data
 {
     const auto compatible_data = payload.subspan(8);
-    std::span<const fourcc_string> compatible_brands(
-        reinterpret_cast<const fourcc_string*>(compatible_data.data()),
+    std::span<const mbmff::fourcc_string> compatible_brands(
+        reinterpret_cast<const mbmff::fourcc_string*>(compatible_data.data()),
         compatible_data.size() / 4
     );
     return mbmff::ftyp_data{
-        fourcc_string::from_data(payload),
+        mbmff::fourcc_string::from_data(payload),
         mbmff::read_be<uint32_t>(payload.subspan(4)),
         compatible_brands
     };
 }
 #ifdef MBMFF_ENABLE_CONSTEXPR_TEST
 // validate must reject payload < 8 bytes
-static_assert(!mbmff::basic_box_view<box_type::ftyp>::validate(
-    {mbmff::box_header{}, std::span<const std::byte>{}}));
+static_assert(
+    !mbmff::basic_box_view<mbmff::box_type::ftyp>::validate({mbmff::box_header{}, std::span<const std::byte>{}})
+);
 
 // validate must reject payload not divisible by 4
 static_assert([] {
     constexpr std::byte bad_div[10]{};
-    auto r = mbmff::basic_box_view<box_type::ftyp>::validate(
-        {mbmff::box_header{}, std::span(bad_div)});
+    auto r = mbmff::basic_box_view<mbmff::box_type::ftyp>::validate({mbmff::box_header{}, std::span(bad_div)});
     return !r;
 }());
 #endif

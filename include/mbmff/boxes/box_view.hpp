@@ -31,7 +31,15 @@
     MACRO(ipma)                        \
     MACRO(pasp)                        \
     MACRO(infe)                        \
-    MACRO(mvhd)
+    MACRO(mvhd)                        \
+    MACRO(tkhd)                        \
+    MACRO(elst)                        \
+    MACRO(mdhd)                        \
+    MACRO(vmhd)                        \
+    MACRO(smhd)                        \
+    MACRO(stts)                        \
+    MACRO(stsd)                        \
+    MACRO(dref)
 
 #define MBMFF_FLAG_OPERATORS(EnumType)                                                   \
     constexpr auto operator|(EnumType a, EnumType b) noexcept -> EnumType                \
@@ -53,7 +61,10 @@
 
 namespace mbmff {
 #define MBMFF_ITERATE_ENUM(name) name = mbmff::fourcc(#name),
-enum class box_type : std::uint32_t { unknown, MBMFF_ITERATE_BOX_TYPES(MBMFF_ITERATE_ENUM) };
+enum class box_type : std::uint32_t {
+    unknown,
+    MBMFF_ITERATE_BOX_TYPES(MBMFF_ITERATE_ENUM) url = mbmff::fourcc("url ")
+};
 
 //------------------------------------------------------------------------------------------------------------
 enum class box_properties : std::uint32_t {
@@ -111,7 +122,8 @@ public:
     }
 };
 
-using any_box_view = struct box_view_base;
+struct box_view_base;
+using any_box_view = mbmff::box_view_base;
 
 struct box_view_base : mbmff::box_header {
     std::span<const std::byte> payload{};

@@ -9,13 +9,13 @@ struct hdlr_data {
 };
 
 template <>
-struct basic_box_view<mbmff::box_type::hdlr> : public mbmff::box_view_base {
+struct mbmff::basic_box_view<mbmff::box_type::hdlr> : public mbmff::box_view_base {
     constexpr static mbmff::box_properties properties = mbmff::box_properties::full_box;
     constexpr static auto validate(mbmff::any_box_view box) noexcept -> mbmff::result<mbmff::any_box_view>;
     constexpr auto value() const noexcept -> mbmff::hdlr_data;
 };
 
-inline constexpr auto basic_box_view<box_type::hdlr>::validate(mbmff::any_box_view box) noexcept
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::hdlr>::validate(mbmff::any_box_view box) noexcept
     -> mbmff::result<mbmff::any_box_view>
 {
     if (box.payload.size() < 4) {
@@ -30,7 +30,7 @@ inline constexpr auto basic_box_view<box_type::hdlr>::validate(mbmff::any_box_vi
     return {box};
 }
 
-inline constexpr auto basic_box_view<box_type::hdlr>::value() const noexcept -> mbmff::hdlr_data
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::hdlr>::value() const noexcept -> mbmff::hdlr_data
 {
     mbmff::hdlr_data result{};
     result.handler_type = mbmff::fourcc_string::from_data(payload.subspan(4));

@@ -1,6 +1,6 @@
 #pragma once
-#include "box_view.hpp"
 #include <array>
+#include "box_view.hpp"
 
 namespace mbmff {
 
@@ -16,13 +16,13 @@ struct mvhd_data {
 };
 
 template <>
-struct basic_box_view<mbmff::box_type::mvhd> : public mbmff::box_view_base {
+struct mbmff::basic_box_view<mbmff::box_type::mvhd> : public mbmff::box_view_base {
     constexpr static mbmff::box_properties properties = mbmff::box_properties::full_box;
     constexpr static auto validate(mbmff::any_box_view box) noexcept -> mbmff::result<mbmff::any_box_view>;
     constexpr auto value() const noexcept -> mbmff::mvhd_data;
 };
 
-inline constexpr auto basic_box_view<box_type::mvhd>::validate(mbmff::any_box_view box) noexcept
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::mvhd>::validate(mbmff::any_box_view box) noexcept
     -> mbmff::result<mbmff::any_box_view>
 {
     if (box.payload.size() < 4) {
@@ -38,7 +38,7 @@ inline constexpr auto basic_box_view<box_type::mvhd>::validate(mbmff::any_box_vi
     return {box};
 }
 
-inline constexpr auto basic_box_view<box_type::mvhd>::value() const noexcept -> mbmff::mvhd_data
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::mvhd>::value() const noexcept -> mbmff::mvhd_data
 {
     mbmff::mvhd_data result{};
     if (payload.empty() && payload.data() == nullptr) {
@@ -73,53 +73,41 @@ inline constexpr auto basic_box_view<box_type::mvhd>::value() const noexcept -> 
 
 #ifdef MBMFF_ENABLE_CONSTEXPR_TEST
 // validate must reject payload < 4 bytes
-static_assert(!mbmff::basic_box_view<box_type::mvhd>::validate(
-    {mbmff::box_header{}, std::span<const std::byte>{}}));
+static_assert(
+    !mbmff::basic_box_view<mbmff::box_type::mvhd>::validate({mbmff::box_header{}, std::span<const std::byte>{}})
+);
 
 // validate must reject version 0 payload < 96 bytes (after 4-byte full header)
-static_assert(!mbmff::basic_box_view<box_type::mvhd>::validate(
-    {mbmff::box_header{},
-     std::span<const std::byte>(std::array<std::byte, 4>{std::byte{0x00}}.data(), 4)}));
+static_assert(!mbmff::basic_box_view<mbmff::box_type::mvhd>::validate(
+    {mbmff::box_header{}, std::span<const std::byte>(std::array<std::byte, 4>{std::byte{0x00}}.data(), 4)}
+));
 
 // value on a valid version 0 mvhd (data from ISOBMFF test)
 static_assert([] {
     constexpr std::array<std::byte, 96> data{
-        std::byte{0xe4}, std::byte{0x00}, std::byte{0xb3}, std::byte{0x34},
-        std::byte{0xe4}, std::byte{0x00}, std::byte{0xb3}, std::byte{0x34},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x27}, std::byte{0x10},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x37}, std::byte{0x02},
-        std::byte{0x00}, std::byte{0x01}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x01}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x01}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x01}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x40}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x03},
+        std::byte{0xe4}, std::byte{0x00}, std::byte{0xb3}, std::byte{0x34}, std::byte{0xe4}, std::byte{0x00},
+        std::byte{0xb3}, std::byte{0x34}, std::byte{0x00}, std::byte{0x00}, std::byte{0x27}, std::byte{0x10},
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x37}, std::byte{0x02}, std::byte{0x00}, std::byte{0x01},
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x01}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x01}, std::byte{0x00}, std::byte{0x00},
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
+        std::byte{0x00}, std::byte{0x01}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x40}, std::byte{0x00},
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x03},
     };
-    mbmff::basic_box_view<box_type::mvhd> mvhd;
+    mbmff::basic_box_view<mbmff::box_type::mvhd> mvhd;
     mvhd.version_ = 0;
     mvhd.payload = std::span(data);
     auto v = mvhd.value();
-    return v.creation_time == 0xe400b334
-        && v.modification_time == 0xe400b334
-        && v.timescale == 10000
-        && v.duration == 14082
-        && v.rate == 0x00010000
-        && v.volume == 0x0100
-        && v.next_track_id == 3;
+    return v.creation_time == 0xe400b334 && v.modification_time == 0xe400b334 && v.timescale == 10000
+        && v.duration == 14082 && v.rate == 0x00010000 && v.volume == 0x0100 && v.next_track_id == 3;
 }());
 #endif
 

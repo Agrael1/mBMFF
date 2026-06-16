@@ -87,13 +87,13 @@ struct iloc_data {
 };
 
 template <>
-struct basic_box_view<mbmff::box_type::iloc> : public mbmff::box_view_base {
+struct mbmff::basic_box_view<mbmff::box_type::iloc> : public mbmff::box_view_base {
     constexpr static mbmff::box_properties properties = mbmff::box_properties::full_box;
     constexpr static auto validate(mbmff::any_box_view box) noexcept -> mbmff::result<mbmff::any_box_view>;
     constexpr auto value() const noexcept -> mbmff::iloc_data;
 };
 
-inline constexpr auto mbmff::basic_box_view<box_type::iloc>::validate(mbmff::any_box_view box) noexcept
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::iloc>::validate(mbmff::any_box_view box) noexcept
     -> mbmff::result<mbmff::any_box_view>
 {
     if (box.payload.size() < 4) {
@@ -112,10 +112,12 @@ inline constexpr auto mbmff::basic_box_view<box_type::iloc>::validate(mbmff::any
     return {box};
 }
 
-inline constexpr auto mbmff::basic_box_view<box_type::iloc>::value() const noexcept -> mbmff::iloc_data
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::iloc>::value() const noexcept -> mbmff::iloc_data
 {
     mbmff::iloc_data result{};
-    if (payload.size() < 2) return result;
+    if (payload.size() < 2) {
+        return result;
+    }
 
     auto first_byte = static_cast<std::uint8_t>(payload[0]);
     result.offset_size = (first_byte >> 4) & 0x0F;
@@ -135,7 +137,8 @@ inline constexpr auto mbmff::basic_box_view<box_type::iloc>::value() const noexc
     return result;
 }
 
-class iloc_item_iterator {
+class iloc_item_iterator
+{
     using iterator_category = std::forward_iterator_tag;
     using value_type = mbmff::iloc_item;
     using difference_type = std::ptrdiff_t;
@@ -243,8 +246,7 @@ public:
         const std::byte* data = current_item.extent_data.data();
         std::size_t total_extent_size = current_item.extent_count * extent_size();
 
-        remaining_ = {data + total_extent_size,
-                      remaining_.size() - (data - remaining_.data()) - total_extent_size};
+        remaining_ = {data + total_extent_size, remaining_.size() - (data - remaining_.data()) - total_extent_size};
 
         return *this;
     }
@@ -260,8 +262,7 @@ public:
         if (remaining_.empty() && other.remaining_.empty()) {
             return true;
         }
-        return remaining_.data() == other.remaining_.data()
-            && remaining_.size() == other.remaining_.size();
+        return remaining_.data() == other.remaining_.data() && remaining_.size() == other.remaining_.size();
     }
 };
 

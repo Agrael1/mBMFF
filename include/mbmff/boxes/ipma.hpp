@@ -48,13 +48,13 @@ struct ipma_data {
 };
 
 template <>
-struct basic_box_view<mbmff::box_type::ipma> : public mbmff::box_view_base {
+struct mbmff::basic_box_view<mbmff::box_type::ipma> : public mbmff::box_view_base {
     constexpr static mbmff::box_properties properties = mbmff::box_properties::full_box;
     constexpr static auto validate(mbmff::any_box_view box) noexcept -> mbmff::result<mbmff::any_box_view>;
     constexpr auto value() const noexcept -> mbmff::ipma_data;
 };
 
-inline constexpr auto basic_box_view<box_type::ipma>::validate(mbmff::any_box_view box) noexcept
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::ipma>::validate(mbmff::any_box_view box) noexcept
     -> mbmff::result<mbmff::any_box_view>
 {
     if (box.payload.size() < 4) {
@@ -70,7 +70,7 @@ inline constexpr auto basic_box_view<box_type::ipma>::validate(mbmff::any_box_vi
     return {box};
 }
 
-inline constexpr auto basic_box_view<box_type::ipma>::value() const noexcept -> mbmff::ipma_data
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::ipma>::value() const noexcept -> mbmff::ipma_data
 {
     mbmff::ipma_data result{};
     result.entry_count = mbmff::read_be<std::uint32_t>(payload);
@@ -80,7 +80,8 @@ inline constexpr auto basic_box_view<box_type::ipma>::value() const noexcept -> 
     return result;
 }
 
-class ipma_entry_iterator {
+class ipma_entry_iterator
+{
     using iterator_category = std::forward_iterator_tag;
     using value_type = mbmff::ipma_entry;
     using difference_type = std::ptrdiff_t;

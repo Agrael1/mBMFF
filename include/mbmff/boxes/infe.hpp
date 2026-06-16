@@ -14,13 +14,13 @@ struct infe_data {
 };
 
 template <>
-struct basic_box_view<mbmff::box_type::infe> : public mbmff::box_view_base {
+struct mbmff::basic_box_view<mbmff::box_type::infe> : public mbmff::box_view_base {
     constexpr static mbmff::box_properties properties = mbmff::box_properties::full_box;
     constexpr static auto validate(mbmff::any_box_view box) noexcept -> mbmff::result<mbmff::any_box_view>;
     constexpr auto value() const noexcept -> mbmff::infe_data;
 };
 
-inline constexpr auto basic_box_view<box_type::infe>::validate(mbmff::any_box_view box) noexcept
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::infe>::validate(mbmff::any_box_view box) noexcept
     -> mbmff::result<mbmff::any_box_view>
 {
     if (box.payload.size() < 4) {
@@ -29,15 +29,14 @@ inline constexpr auto basic_box_view<box_type::infe>::validate(mbmff::any_box_vi
     box.fill_full_header(box.payload);
     box.payload = box.payload.subspan(4);
 
-    auto need = (box.version() == 0 || box.version() == 1 || box.version() == 2)
-        ? std::size_t{4} : std::size_t{6};
+    auto need = (box.version() == 0 || box.version() == 1 || box.version() == 2) ? std::size_t{4} : std::size_t{6};
     if (box.payload.size() < need) {
         return mbmff::make_result<mbmff::any_box_view>(mbmff::error_code::need_more_data, need);
     }
     return {box};
 }
 
-inline constexpr auto basic_box_view<box_type::infe>::value() const noexcept -> mbmff::infe_data
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::infe>::value() const noexcept -> mbmff::infe_data
 {
     mbmff::infe_data result{};
     auto xversion = version();
