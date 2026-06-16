@@ -13,7 +13,7 @@ struct esds_data {
 };
 
 template <>
-struct mbmff::basic_box_view<mbmff::box_type::esds> : public mbmff::box_view_base {
+struct basic_box_view<mbmff::box_type::esds> : public mbmff::box_view_base {
     constexpr static mbmff::box_properties properties = mbmff::box_properties::full_box;
     constexpr static auto validate(mbmff::any_box_view box) noexcept -> mbmff::result<mbmff::any_box_view>;
     constexpr auto value() const noexcept -> mbmff::esds_data;

@@ -3,7 +3,7 @@
 
 namespace mbmff {
 template <>
-struct mbmff::basic_box_view<mbmff::box_type::meta> : public mbmff::box_view_base {
+struct basic_box_view<mbmff::box_type::meta> : public mbmff::box_view_base {
     // full_box is not ticked here because `meta` can
     // be a regular box in some formats (e.g. QTFF)
     constexpr static mbmff::box_properties properties = mbmff::box_properties::container;

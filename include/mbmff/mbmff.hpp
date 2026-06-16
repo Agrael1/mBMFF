@@ -248,18 +248,15 @@ using partial_box_iterator = mbmff::box_iterator<mbmff::iterator_flags::allow_pa
 
 #ifdef MBMFF_ENABLE_CONSTEXPR_TEST
 
+template <mbmff::box_type Box>
+concept box_not_implemented = requires { mbmff::basic_box_view<Box>::not_implemented; };
+
 // Test if all boxes are implemented
-#    define MBMFF_TEST_ALL_IMPLEMENTED(name)                                                        \
-        static_assert(                                                                              \
-            !requires { requires(mbmff::basic_box_view<mbmff::box_type::name>::not_implemented); }, \
-            "Box type " #name " is not implemented."                                                \
-        );
+#    define MBMFF_TEST_ALL_IMPLEMENTED(name) \
+        static_assert(!box_not_implemented<mbmff::box_type::name>, "Box type " #name " is not implemented.");
 
 MBMFF_ITERATE_BOX_TYPES(MBMFF_TEST_ALL_IMPLEMENTED)
-static_assert(
-    !requires { requires(mbmff::basic_box_view<mbmff::box_type::url>::not_implemented); },
-    "Box type url is not implemented."
-);
+static_assert(!box_not_implemented<mbmff::box_type::url>, "Box type url is not implemented.");
 #    undef MBMFF_TEST_ALL_IMPLEMENTED
 
 // test if container property is correctly detected

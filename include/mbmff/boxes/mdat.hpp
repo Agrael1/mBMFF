@@ -3,7 +3,7 @@
 
 namespace mbmff {
 template <>
-struct mbmff::basic_box_view<mbmff::box_type::mdat> : public mbmff::box_view_base {
+struct basic_box_view<mbmff::box_type::mdat> : public mbmff::box_view_base {
     constexpr static mbmff::box_properties properties = mbmff::box_properties::none;
 };
 

@@ -4,7 +4,7 @@
 namespace mbmff {
 
 template <>
-struct mbmff::basic_box_view<mbmff::box_type::iref> : public mbmff::box_view_base {
+struct basic_box_view<mbmff::box_type::iref> : public mbmff::box_view_base {
     constexpr static mbmff::box_properties properties = mbmff::box_properties::full_box
                                                       | mbmff::box_properties::container;
     constexpr static auto validate(mbmff::any_box_view box) noexcept -> mbmff::result<mbmff::any_box_view>;
