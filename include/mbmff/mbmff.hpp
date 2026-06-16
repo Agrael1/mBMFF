@@ -1,29 +1,51 @@
 #pragma once
+#include "boxes/alis.hpp"
+#include "boxes/apcn.hpp"
 #include "boxes/av1C.hpp"
+#include "boxes/avc1.hpp"
+#include "boxes/avcC.hpp"
+#include "boxes/co64.hpp"
+#include "boxes/colr.hpp"
 #include "boxes/containers.hpp"
+#include "boxes/ctts.hpp"
 #include "boxes/dref.hpp"
 #include "boxes/elst.hpp"
+#include "boxes/esds.hpp"
+#include "boxes/fiel.hpp"
+#include "boxes/free.hpp"
 #include "boxes/ftyp.hpp"
+#include "boxes/gmin.hpp"
 #include "boxes/hdlr.hpp"
+#include "boxes/hev1.hpp"
+#include "boxes/hvcC.hpp"
 #include "boxes/iinf.hpp"
 #include "boxes/iloc.hpp"
 #include "boxes/infe.hpp"
 #include "boxes/ipma.hpp"
 #include "boxes/iref.hpp"
 #include "boxes/ispe.hpp"
+#include "boxes/load.hpp"
 #include "boxes/mdat.hpp"
 #include "boxes/mdhd.hpp"
 #include "boxes/meta.hpp"
+#include "boxes/mp4a.hpp"
 #include "boxes/mvhd.hpp"
 #include "boxes/pasp.hpp"
 #include "boxes/pitm.hpp"
 #include "boxes/pixi.hpp"
+#include "boxes/sdtp.hpp"
 #include "boxes/smhd.hpp"
+#include "boxes/stco.hpp"
+#include "boxes/stsc.hpp"
 #include "boxes/stsd.hpp"
+#include "boxes/stss.hpp"
+#include "boxes/stsz.hpp"
 #include "boxes/stts.hpp"
 #include "boxes/tkhd.hpp"
+#include "boxes/tmcd.hpp"
 #include "boxes/url.hpp"
 #include "boxes/vmhd.hpp"
+#include "boxes/wide.hpp"
 
 namespace mbmff {
 
@@ -226,172 +248,227 @@ using partial_box_iterator = mbmff::box_iterator<mbmff::iterator_flags::allow_pa
 
 #ifdef MBMFF_ENABLE_CONSTEXPR_TEST
 
+// Test if all boxes are implemented
+#    define MBMFF_TEST_ALL_IMPLEMENTED(name)                                                        \
+        static_assert(                                                                              \
+            !requires { requires(mbmff::basic_box_view<mbmff::box_type::name>::not_implemented); }, \
+            "Box type " #name " is not implemented."                                                \
+        );
+
+MBMFF_ITERATE_BOX_TYPES(MBMFF_TEST_ALL_IMPLEMENTED)
+static_assert(
+    !requires { requires(mbmff::basic_box_view<mbmff::box_type::url>::not_implemented); },
+    "Box type url is not implemented."
+);
+#    undef MBMFF_TEST_ALL_IMPLEMENTED
+
+// test if container property is correctly detected
+static_assert(
+    [] {
+        std::array<std::byte, 8> data{
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x08},
+            std::byte{'m'},
+            std::byte{'o'},
+            std::byte{'o'},
+            std::byte{'v'},
+        };
+        auto r = mbmff::parse(std::span<const std::byte>(data));
+        return r && r->type_ == mbmff::box_type::moov
+            && mbmff::has(mbmff::get_box_properties(r->type_), mbmff::box_properties::container);
+    }(),
+    "moov container property should be detected"
+);
+
 // parse() without flags rejects truncated data (backward compat)
-static_assert([] {
-    std::array<std::byte, 12> data{
-        std::byte{0x00},
-        std::byte{0x00},
-        std::byte{0x03},
-        std::byte{0xE8},
-        std::byte{'m'},
-        std::byte{'d'},
-        std::byte{'a'},
-        std::byte{'t'},
-    };
-    auto r = mbmff::parse(std::span<const std::byte>(data));
-    return !r && r.code == mbmff::error_code::need_more_data && r.needed == 1000;
-}());
+static_assert(
+    [] {
+        std::array<std::byte, 12> data{
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x03},
+            std::byte{0xE8},
+            std::byte{'m'},
+            std::byte{'d'},
+            std::byte{'a'},
+            std::byte{'t'},
+        };
+        auto r = mbmff::parse(std::span<const std::byte>(data));
+        return !r && r.code == mbmff::error_code::need_more_data && r.needed == 1000;
+    }(),
+    "parse() without flags should reject truncated data"
+);
 
 // parse() with allow_partial returns truncated for incomplete box
-static_assert([] {
-    std::array<std::byte, 12> data{
-        std::byte{0x00},
-        std::byte{0x00},
-        std::byte{0x03},
-        std::byte{0xE8},
-        std::byte{'m'},
-        std::byte{'d'},
-        std::byte{'a'},
-        std::byte{'t'},
-    };
-    auto r = mbmff::parse<mbmff::iterator_flags::allow_partial>(std::span<const std::byte>(data));
-    return !r && r.code == mbmff::error_code::truncated && r->type_ == mbmff::box_type::mdat && r->size_ == 1000
-        && r->payload.size() == 4;
-}());
+static_assert(
+    [] {
+        std::array<std::byte, 12> data{
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x03},
+            std::byte{0xE8},
+            std::byte{'m'},
+            std::byte{'d'},
+            std::byte{'a'},
+            std::byte{'t'},
+        };
+        auto r = mbmff::parse<mbmff::iterator_flags::allow_partial>(std::span<const std::byte>(data));
+        return !r && r.code == mbmff::error_code::truncated && r->type_ == mbmff::box_type::mdat && r->size_ == 1000
+            && r->payload.size() == 4;
+    }(),
+    "parse(allow_partial) should return truncated for incomplete box"
+);
 
 // parse() with allow_partial returns success for complete box
-static_assert([] {
-    std::array<std::byte, 12> data{
-        std::byte{0x00},
-        std::byte{0x00},
-        std::byte{0x00},
-        std::byte{0x0C},
-        std::byte{'m'},
-        std::byte{'d'},
-        std::byte{'a'},
-        std::byte{'t'},
-        std::byte{0x01},
-        std::byte{0x02},
-        std::byte{0x03},
-        std::byte{0x04},
-    };
-    auto r = mbmff::parse<mbmff::iterator_flags::allow_partial>(std::span<const std::byte>(data));
-    return r && r.code == mbmff::error_code::success && r->type_ == mbmff::box_type::mdat;
-}());
+static_assert(
+    [] {
+        std::array<std::byte, 12> data{
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x0C},
+            std::byte{'m'},
+            std::byte{'d'},
+            std::byte{'a'},
+            std::byte{'t'},
+            std::byte{0x01},
+            std::byte{0x02},
+            std::byte{0x03},
+            std::byte{0x04},
+        };
+        auto r = mbmff::parse<mbmff::iterator_flags::allow_partial>(std::span<const std::byte>(data));
+        return r && r.code == mbmff::error_code::success && r->type_ == mbmff::box_type::mdat;
+    }(),
+    "parse(allow_partial) should return success for complete box"
+);
 
 // allow_partial still rejects when even the validate minimum is absent
-static_assert([] {
-    std::array<std::byte, 12> data{
-        std::byte{0x00},
-        std::byte{0x00},
-        std::byte{0x00},
-        std::byte{0x10},
-        std::byte{'f'},
-        std::byte{'t'},
-        std::byte{'y'},
-        std::byte{'p'},
-        std::byte{'a'},
-        std::byte{'v'},
-        std::byte{'0'},
-        std::byte{'1'},
-    };
-    auto r = mbmff::parse<mbmff::iterator_flags::allow_partial>(std::span<const std::byte>(data));
-    return !r && r.code == mbmff::error_code::need_more_data && r.needed == 8;
-}());
+static_assert(
+    [] {
+        std::array<std::byte, 12> data{
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x10},
+            std::byte{'f'},
+            std::byte{'t'},
+            std::byte{'y'},
+            std::byte{'p'},
+            std::byte{'a'},
+            std::byte{'v'},
+            std::byte{'0'},
+            std::byte{'1'},
+        };
+        auto r = mbmff::parse<mbmff::iterator_flags::allow_partial>(std::span<const std::byte>(data));
+        return !r && r.code == mbmff::error_code::need_more_data && r.needed == 8;
+    }(),
+    "allow_partial should still reject data lacking validate minimum"
+);
 
 // box_iterator with allow_partial continues past truncated boxes
-static_assert([] {
-    std::array<std::byte, 24> data{
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x0C}, std::byte{'m'},  std::byte{'d'},
-        std::byte{'a'},  std::byte{'t'},  std::byte{0x01}, std::byte{0x02}, std::byte{0x03}, std::byte{0x04},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x03}, std::byte{0xE8}, std::byte{'m'},  std::byte{'o'},
-        std::byte{'o'},  std::byte{'v'},  std::byte{0xAA}, std::byte{0xBB}, std::byte{0xCC}, std::byte{0xDD},
-    };
-    auto it = mbmff::box_iterator<mbmff::iterator_flags::allow_partial>(std::span<const std::byte>(data));
-    auto end = it.end();
+static_assert(
+    [] {
+        std::array<std::byte, 24> data{
+            std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x0C}, std::byte{'m'},  std::byte{'d'},
+            std::byte{'a'},  std::byte{'t'},  std::byte{0x01}, std::byte{0x02}, std::byte{0x03}, std::byte{0x04},
+            std::byte{0x00}, std::byte{0x00}, std::byte{0x03}, std::byte{0xE8}, std::byte{'m'},  std::byte{'o'},
+            std::byte{'o'},  std::byte{'v'},  std::byte{0xAA}, std::byte{0xBB}, std::byte{0xCC}, std::byte{0xDD},
+        };
+        auto it = mbmff::box_iterator<mbmff::iterator_flags::allow_partial>(std::span<const std::byte>(data));
+        auto end = it.end();
 
-    if (it == end) {
-        return false;
-    }
-    auto r1 = *it;
-    if (!r1 || r1->type_ != mbmff::box_type::mdat) {
-        return false;
-    }
-    ++it;
+        if (it == end) {
+            return false;
+        }
+        auto r1 = *it;
+        if (!r1 || r1->type_ != mbmff::box_type::mdat) {
+            return false;
+        }
+        ++it;
 
-    if (it == end) {
-        return false;
-    }
-    auto r2 = *it;
-    if (r2.code != mbmff::error_code::truncated || r2->type_ != mbmff::box_type::moov) {
-        return false;
-    }
-    ++it;
+        if (it == end) {
+            return false;
+        }
+        auto r2 = *it;
+        if (r2.code != mbmff::error_code::truncated || r2->type_ != mbmff::box_type::moov) {
+            return false;
+        }
+        ++it;
 
-    return it == end;
-}());
+        return it == end;
+    }(),
+    "box_iterator(allow_partial) should continue past truncated boxes"
+);
 // box_iterator without allow_partial stops at truncated data
-static_assert([] {
-    std::array<std::byte, 24> data{
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x0C}, std::byte{'m'},  std::byte{'d'},
-        std::byte{'a'},  std::byte{'t'},  std::byte{0x01}, std::byte{0x02}, std::byte{0x03}, std::byte{0x04},
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x03}, std::byte{0xE8}, std::byte{'m'},  std::byte{'o'},
-        std::byte{'o'},  std::byte{'v'},  std::byte{0xAA}, std::byte{0xBB}, std::byte{0xCC}, std::byte{0xDD},
-    };
-    auto it = mbmff::box_iterator(std::span<const std::byte>(data));
-    auto end = it.end();
+static_assert(
+    [] {
+        std::array<std::byte, 24> data{
+            std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x0C}, std::byte{'m'},  std::byte{'d'},
+            std::byte{'a'},  std::byte{'t'},  std::byte{0x01}, std::byte{0x02}, std::byte{0x03}, std::byte{0x04},
+            std::byte{0x00}, std::byte{0x00}, std::byte{0x03}, std::byte{0xE8}, std::byte{'m'},  std::byte{'o'},
+            std::byte{'o'},  std::byte{'v'},  std::byte{0xAA}, std::byte{0xBB}, std::byte{0xCC}, std::byte{0xDD},
+        };
+        auto it = mbmff::box_iterator(std::span<const std::byte>(data));
+        auto end = it.end();
 
-    if (it == end) {
-        return false;
-    }
-    if (!(*it)) {
-        return false; // mdat
-    }
-    ++it;
+        if (it == end) {
+            return false;
+        }
+        if (!(*it)) {
+            return false; // mdat
+        }
+        ++it;
 
-    // truncated moov — parse fails → iterator terminates
-    if (it == end) {
-        return false;
-    }
-    if ((*it).code != mbmff::error_code::need_more_data) {
-        return false;
-    }
-    ++it;
+        // truncated moov — parse fails → iterator terminates
+        if (it == end) {
+            return false;
+        }
+        if ((*it).code != mbmff::error_code::need_more_data) {
+            return false;
+        }
+        ++it;
 
-    return it == end;
-}());
+        return it == end;
+    }(),
+    "box_iterator should stop at truncated data"
+);
 // recursive + allow_partial descends into a truncated container's children
-static_assert([] {
-    std::array<std::byte, 20> data{
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x03}, std::byte{0xE8}, std::byte{'m'},
-        std::byte{'o'},  std::byte{'o'},  std::byte{'v'},  std::byte{0x00}, std::byte{0x00},
-        std::byte{0x00}, std::byte{0x0C}, std::byte{'m'},  std::byte{'d'},  std::byte{'a'},
-        std::byte{'t'},  std::byte{0x01}, std::byte{0x02}, std::byte{0x03}, std::byte{0x04},
-    };
-    auto it = mbmff::box_iterator<mbmff::iterator_flags::allow_partial | mbmff::iterator_flags::recursive>(
-        std::span<const std::byte>(data)
+static_assert(
+    [] {
+        std::array<std::byte, 20> data{
+            std::byte{0x00}, std::byte{0x00}, std::byte{0x03}, std::byte{0xE8}, std::byte{'m'},
+            std::byte{'o'},  std::byte{'o'},  std::byte{'v'},  std::byte{0x00}, std::byte{0x00},
+            std::byte{0x00}, std::byte{0x0C}, std::byte{'m'},  std::byte{'d'},  std::byte{'a'},
+            std::byte{'t'},  std::byte{0x01}, std::byte{0x02}, std::byte{0x03}, std::byte{0x04},
+        };
+        auto it = mbmff::box_iterator<mbmff::iterator_flags::allow_partial | mbmff::iterator_flags::recursive>(
+            std::span<const std::byte>(data)
 
-    );
-    auto end = it.end();
+        );
+        auto end = it.end();
+        if (it == end) {
+            return false;
+        }
 
-    if (it == end) {
-        return false;
-    }
-    if ((*it).code != mbmff::error_code::truncated || (*it)->type_ != mbmff::box_type::moov) {
-        return false;
-    }
-    ++it;
+        if ((*it).code != mbmff::error_code::truncated || (*it)->type_ != mbmff::box_type::moov) {
+            return false;
+        }
+        ++it;
 
-    if (it == end) {
-        return false;
-    }
-    if (!(*it) || (*it)->type_ != mbmff::box_type::mdat) {
-        return false;
-    }
-    ++it;
+        if (it == end) {
+            return false;
+        }
+        if (!(*it) || (*it)->type_ != mbmff::box_type::mdat) {
+            return false;
+        }
+        ++it;
 
-    return it == end;
-}());
+        return it == end;
+    }(),
+    "recursive allow_partial should descend into truncated container"
+);
 
 #endif
 

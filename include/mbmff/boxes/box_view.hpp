@@ -3,43 +3,68 @@
 #include "common.hpp"
 
 #define MBMFF_ITERATE_BOX_TYPES(MACRO) \
-    MACRO(ftyp)                        \
-    MACRO(meta)                        \
-    MACRO(mdat)                        \
-    MACRO(moov)                        \
-    MACRO(trak)                        \
-    MACRO(mdia)                        \
-    MACRO(minf)                        \
-    MACRO(stbl)                        \
-    MACRO(dinf)                        \
-    MACRO(edts)                        \
-    MACRO(udta)                        \
-    MACRO(mvex)                        \
-    MACRO(moof)                        \
-    MACRO(traf)                        \
-    MACRO(mfra)                        \
-    MACRO(iprp)                        \
-    MACRO(ipco)                        \
-    MACRO(iinf)                        \
-    MACRO(iref)                        \
-    MACRO(iloc)                        \
-    MACRO(hdlr)                        \
-    MACRO(pitm)                        \
-    MACRO(ispe)                        \
+    MACRO(alis)                        \
+    MACRO(apcn)                        \
     MACRO(av1C)                        \
-    MACRO(pixi)                        \
-    MACRO(ipma)                        \
-    MACRO(pasp)                        \
-    MACRO(infe)                        \
-    MACRO(mvhd)                        \
-    MACRO(tkhd)                        \
+    MACRO(avc1)                        \
+    MACRO(avcC)                        \
+    MACRO(co64)                        \
+    MACRO(colr)                        \
+    MACRO(ctts)                        \
+    MACRO(dinf)                        \
+    MACRO(dref)                        \
+    MACRO(edts)                        \
     MACRO(elst)                        \
+    MACRO(esds)                        \
+    MACRO(fiel)                        \
+    MACRO(free)                        \
+    MACRO(ftyp)                        \
+    MACRO(gmhd)                        \
+    MACRO(gmin)                        \
+    MACRO(hdlr)                        \
+    MACRO(hev1)                        \
+    MACRO(hvcC)                        \
+    MACRO(iinf)                        \
+    MACRO(iloc)                        \
+    MACRO(ilst)                        \
+    MACRO(infe)                        \
+    MACRO(ipco)                        \
+    MACRO(ipma)                        \
+    MACRO(iprp)                        \
+    MACRO(iref)                        \
+    MACRO(ispe)                        \
+    MACRO(load)                        \
+    MACRO(mdat)                        \
     MACRO(mdhd)                        \
-    MACRO(vmhd)                        \
+    MACRO(mdia)                        \
+    MACRO(meta)                        \
+    MACRO(mfra)                        \
+    MACRO(minf)                        \
+    MACRO(moof)                        \
+    MACRO(moov)                        \
+    MACRO(mp4a)                        \
+    MACRO(mvex)                        \
+    MACRO(mvhd)                        \
+    MACRO(pasp)                        \
+    MACRO(pitm)                        \
+    MACRO(pixi)                        \
+    MACRO(sdtp)                        \
     MACRO(smhd)                        \
-    MACRO(stts)                        \
+    MACRO(stbl)                        \
+    MACRO(stco)                        \
+    MACRO(stsc)                        \
     MACRO(stsd)                        \
-    MACRO(dref)
+    MACRO(stss)                        \
+    MACRO(stsz)                        \
+    MACRO(stts)                        \
+    MACRO(tkhd)                        \
+    MACRO(tmcd)                        \
+    MACRO(traf)                        \
+    MACRO(trak)                        \
+    MACRO(tref)                        \
+    MACRO(udta)                        \
+    MACRO(vmhd)                        \
+    MACRO(wide)
 
 #define MBMFF_FLAG_OPERATORS(EnumType)                                                   \
     constexpr auto operator|(EnumType a, EnumType b) noexcept -> EnumType                \
@@ -138,6 +163,7 @@ public:
 template <mbmff::box_type Type>
 struct basic_box_view : public mbmff::box_view_base {
     constexpr static mbmff::box_properties properties = mbmff::box_properties::none;
+    constexpr static bool not_implemented = true;
 };
 
 //------------------------------------------------------------------------------------------------------------

@@ -86,8 +86,10 @@ constexpr auto make_result(Type value, mbmff::error_code code) noexcept -> mbmff
 
 constexpr auto fourcc(const char* str) noexcept -> std::uint32_t
 {
-    return (static_cast<uint32_t>(str[3]) << 24) | (static_cast<uint32_t>(str[2]) << 16)
-         | (static_cast<uint32_t>(str[1]) << 8) | static_cast<uint32_t>(str[0]);
+    return (static_cast<uint32_t>(static_cast<unsigned char>(str[3])) << 24)
+         | (static_cast<uint32_t>(static_cast<unsigned char>(str[2])) << 16)
+         | (static_cast<uint32_t>(static_cast<unsigned char>(str[1])) << 8)
+         | static_cast<uint32_t>(static_cast<unsigned char>(str[0]));
 }
 
 struct fourcc_string {
