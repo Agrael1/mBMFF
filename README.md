@@ -54,7 +54,6 @@ int main(int argc, char* argv[])
 ## Requirements
 
 - C++20 compiler (tested with MSVC 2022, GCC 14, Clang 18)
-- C++23 for the test runner (`std::format`)
 
 ## Consumption
 

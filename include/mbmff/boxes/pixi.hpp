@@ -14,7 +14,7 @@ struct basic_box_view<mbmff::box_type::pixi> : public mbmff::box_view_base {
     constexpr auto value() const noexcept -> mbmff::pixi_data;
 };
 
-inline constexpr auto basic_box_view<box_type::pixi>::validate(mbmff::any_box_view box) noexcept
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::pixi>::validate(mbmff::any_box_view box) noexcept
     -> mbmff::result<mbmff::any_box_view>
 {
     if (box.payload.size() < 4) {
@@ -29,7 +29,7 @@ inline constexpr auto basic_box_view<box_type::pixi>::validate(mbmff::any_box_vi
     return {box};
 }
 
-inline constexpr auto basic_box_view<box_type::pixi>::value() const noexcept -> mbmff::pixi_data
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::pixi>::value() const noexcept -> mbmff::pixi_data
 {
     mbmff::pixi_data result{};
     auto num_channels = static_cast<std::uint8_t>(payload[0]);

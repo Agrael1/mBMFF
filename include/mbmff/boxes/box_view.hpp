@@ -3,34 +3,68 @@
 #include "common.hpp"
 
 #define MBMFF_ITERATE_BOX_TYPES(MACRO) \
-    MACRO(ftyp)                        \
-    MACRO(meta)                        \
-    MACRO(mdat)                        \
-    MACRO(moov)                        \
-    MACRO(trak)                        \
-    MACRO(mdia)                        \
-    MACRO(minf)                        \
-    MACRO(stbl)                        \
-    MACRO(dinf)                        \
-    MACRO(edts)                        \
-    MACRO(udta)                        \
-    MACRO(mvex)                        \
-    MACRO(moof)                        \
-    MACRO(traf)                        \
-    MACRO(mfra)                        \
-    MACRO(iprp)                        \
-    MACRO(ipco)                        \
-    MACRO(iinf)                        \
-    MACRO(iref)                        \
-    MACRO(iloc)                        \
-    MACRO(hdlr)                        \
-    MACRO(pitm)                        \
-    MACRO(ispe)                        \
+    MACRO(alis)                        \
+    MACRO(apcn)                        \
     MACRO(av1C)                        \
-    MACRO(pixi)                        \
+    MACRO(avc1)                        \
+    MACRO(avcC)                        \
+    MACRO(co64)                        \
+    MACRO(colr)                        \
+    MACRO(ctts)                        \
+    MACRO(dinf)                        \
+    MACRO(dref)                        \
+    MACRO(edts)                        \
+    MACRO(elst)                        \
+    MACRO(esds)                        \
+    MACRO(fiel)                        \
+    MACRO(free)                        \
+    MACRO(ftyp)                        \
+    MACRO(gmhd)                        \
+    MACRO(gmin)                        \
+    MACRO(hdlr)                        \
+    MACRO(hev1)                        \
+    MACRO(hvcC)                        \
+    MACRO(iinf)                        \
+    MACRO(iloc)                        \
+    MACRO(ilst)                        \
+    MACRO(infe)                        \
+    MACRO(ipco)                        \
     MACRO(ipma)                        \
+    MACRO(iprp)                        \
+    MACRO(iref)                        \
+    MACRO(ispe)                        \
+    MACRO(load)                        \
+    MACRO(mdat)                        \
+    MACRO(mdhd)                        \
+    MACRO(mdia)                        \
+    MACRO(meta)                        \
+    MACRO(mfra)                        \
+    MACRO(minf)                        \
+    MACRO(moof)                        \
+    MACRO(moov)                        \
+    MACRO(mp4a)                        \
+    MACRO(mvex)                        \
+    MACRO(mvhd)                        \
     MACRO(pasp)                        \
-    MACRO(infe)
+    MACRO(pitm)                        \
+    MACRO(pixi)                        \
+    MACRO(sdtp)                        \
+    MACRO(smhd)                        \
+    MACRO(stbl)                        \
+    MACRO(stco)                        \
+    MACRO(stsc)                        \
+    MACRO(stsd)                        \
+    MACRO(stss)                        \
+    MACRO(stsz)                        \
+    MACRO(stts)                        \
+    MACRO(tkhd)                        \
+    MACRO(tmcd)                        \
+    MACRO(traf)                        \
+    MACRO(trak)                        \
+    MACRO(tref)                        \
+    MACRO(udta)                        \
+    MACRO(vmhd)                        \
+    MACRO(wide)
 
 #define MBMFF_FLAG_OPERATORS(EnumType)                                                   \
     constexpr auto operator|(EnumType a, EnumType b) noexcept -> EnumType                \
@@ -52,7 +86,10 @@
 
 namespace mbmff {
 #define MBMFF_ITERATE_ENUM(name) name = mbmff::fourcc(#name),
-enum class box_type : std::uint32_t { unknown, MBMFF_ITERATE_BOX_TYPES(MBMFF_ITERATE_ENUM) };
+enum class box_type : std::uint32_t {
+    unknown,
+    MBMFF_ITERATE_BOX_TYPES(MBMFF_ITERATE_ENUM) url = mbmff::fourcc("url ")
+};
 
 //------------------------------------------------------------------------------------------------------------
 enum class box_properties : std::uint32_t {
@@ -110,7 +147,8 @@ public:
     }
 };
 
-using any_box_view = struct box_view_base;
+struct box_view_base;
+using any_box_view = mbmff::box_view_base;
 
 struct box_view_base : mbmff::box_header {
     std::span<const std::byte> payload{};
@@ -125,6 +163,7 @@ public:
 template <mbmff::box_type Type>
 struct basic_box_view : public mbmff::box_view_base {
     constexpr static mbmff::box_properties properties = mbmff::box_properties::none;
+    constexpr static bool not_implemented = true;
 };
 
 //------------------------------------------------------------------------------------------------------------
@@ -182,10 +221,10 @@ static_assert(
 static_assert(
     []() {
         std::array<std::byte, 8> data{
+            std::byte(0),
+            std::byte(0),
+            std::byte(0),
             std::byte(12), // size = 12
-            std::byte(0),
-            std::byte(0),
-            std::byte(0),
             std::byte('m'),
             std::byte('d'),
             std::byte('a'),

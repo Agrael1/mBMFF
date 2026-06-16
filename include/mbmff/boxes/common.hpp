@@ -11,6 +11,7 @@ enum class error_code {
     success = 0,
     invalid_format,
     need_more_data,
+    truncated,
 };
 
 //------------------------------------------------------------------------------------------------------------
@@ -23,6 +24,8 @@ static constexpr auto to_string(mbmff::error_code code) noexcept -> std::string_
         return "Invalid format";
     case mbmff::error_code::need_more_data:
         return "Need more data";
+    case mbmff::error_code::truncated:
+        return "Truncated";
     default:
         return "Unknown error code";
     }
@@ -73,12 +76,20 @@ constexpr auto make_result(Type value) noexcept -> mbmff::result<Type>
     return {value};
 }
 
+template <typename Type>
+constexpr auto make_result(Type value, mbmff::error_code code) noexcept -> mbmff::result<Type>
+{
+    return {value, code};
+}
+
 //------------------------------------------------------------------------------------------------------------
 
 constexpr auto fourcc(const char* str) noexcept -> std::uint32_t
 {
-    return (static_cast<uint32_t>(str[3]) << 24) | (static_cast<uint32_t>(str[2]) << 16)
-         | (static_cast<uint32_t>(str[1]) << 8) | static_cast<uint32_t>(str[0]);
+    return (static_cast<uint32_t>(static_cast<unsigned char>(str[3])) << 24)
+         | (static_cast<uint32_t>(static_cast<unsigned char>(str[2])) << 16)
+         | (static_cast<uint32_t>(static_cast<unsigned char>(str[1])) << 8)
+         | static_cast<uint32_t>(static_cast<unsigned char>(str[0]));
 }
 
 struct fourcc_string {
@@ -87,7 +98,11 @@ struct fourcc_string {
 public:
     constexpr auto view() const noexcept -> std::string_view
     {
-        return std::string_view(data_.data(), data_.size());
+        auto len = std::size_t{0};
+        while (len < 4 && data_[len] != 0) {
+            ++len;
+        }
+        return std::string_view(data_.data(), len);
     }
     constexpr auto data() const noexcept -> const std::span<const char, 4>
     {
@@ -99,7 +114,7 @@ public:
     }
     constexpr auto to_uint32() const noexcept -> std::uint32_t
     {
-        return fourcc(data_.data());
+        return mbmff::fourcc(data_.data());
     }
 
     constexpr auto operator==(const mbmff::fourcc_string& other) const noexcept -> bool
@@ -127,11 +142,20 @@ public:
     }
     constexpr static auto from_uint32(std::uint32_t value) noexcept -> mbmff::fourcc_string
     {
-        return fourcc_string{std::array<char, 4>{
+        return mbmff::fourcc_string{std::array<char, 4>{
             static_cast<char>(value & 0xFF),
             static_cast<char>((value >> 8) & 0xFF),
             static_cast<char>((value >> 16) & 0xFF),
             static_cast<char>((value >> 24) & 0xFF),
+        }};
+    }
+    constexpr static auto from_language(std::uint16_t lang) noexcept -> mbmff::fourcc_string
+    {
+        return mbmff::fourcc_string{std::array<char, 4>{
+            static_cast<char>('a' + ((lang >> 10) & 0x1F)),
+            static_cast<char>('a' + ((lang >> 5) & 0x1F)),
+            static_cast<char>('a' + ((lang >> 0) & 0x1F)),
+            char{0},
         }};
     }
 };
@@ -174,9 +198,9 @@ constexpr auto read_be(std::span<const std::byte> data) noexcept -> T
             value <<= 8;
             value |= static_cast<T>(data[i]);
         }
-    } else {
-        std::memcpy(&value, data.data(), sizeof(value));
+        return value;
     }
+    std::memcpy(&value, data.data(), sizeof(value));
     return mbmff::byteswap(value);
 }
 

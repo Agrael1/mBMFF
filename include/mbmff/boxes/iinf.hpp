@@ -9,13 +9,13 @@ struct iinf_data {
 
 template <>
 struct basic_box_view<mbmff::box_type::iinf> : public mbmff::box_view_base {
-    constexpr static mbmff::box_properties properties
-        = mbmff::box_properties::full_box | mbmff::box_properties::container;
+    constexpr static mbmff::box_properties properties = mbmff::box_properties::full_box
+                                                      | mbmff::box_properties::container;
     constexpr static auto validate(mbmff::any_box_view box) noexcept -> mbmff::result<mbmff::any_box_view>;
     constexpr auto value() const noexcept -> mbmff::iinf_data;
 };
 
-inline constexpr auto basic_box_view<box_type::iinf>::validate(mbmff::any_box_view box) noexcept
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::iinf>::validate(mbmff::any_box_view box) noexcept
     -> mbmff::result<mbmff::any_box_view>
 {
     if (box.payload.size() < 4) {
@@ -32,7 +32,7 @@ inline constexpr auto basic_box_view<box_type::iinf>::validate(mbmff::any_box_vi
     return {box};
 }
 
-inline constexpr auto basic_box_view<box_type::iinf>::value() const noexcept -> mbmff::iinf_data
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::iinf>::value() const noexcept -> mbmff::iinf_data
 {
     mbmff::iinf_data result{};
     auto entry_size = (version() == 0) ? std::size_t{2} : std::size_t{4};

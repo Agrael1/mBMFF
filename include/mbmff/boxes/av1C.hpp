@@ -22,13 +22,13 @@ struct av1C_data {
 };
 
 template <>
-struct basic_box_view<box_type::av1C> : public box_view_base {
-    constexpr static box_properties properties = box_properties::none;
+struct basic_box_view<mbmff::box_type::av1C> : public mbmff::box_view_base {
+    constexpr static mbmff::box_properties properties = mbmff::box_properties::none;
     constexpr static auto validate(mbmff::any_box_view box) noexcept -> mbmff::result<mbmff::any_box_view>;
     constexpr auto value() const noexcept -> mbmff::av1C_data;
 };
 
-inline constexpr auto basic_box_view<box_type::av1C>::validate(mbmff::any_box_view box) noexcept
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::av1C>::validate(mbmff::any_box_view box) noexcept
     -> mbmff::result<mbmff::any_box_view>
 {
     if (box.payload.size() < 4) {
@@ -37,7 +37,7 @@ inline constexpr auto basic_box_view<box_type::av1C>::validate(mbmff::any_box_vi
     return {box};
 }
 
-constexpr auto basic_box_view<box_type::av1C>::value() const noexcept -> mbmff::av1C_data
+constexpr auto mbmff::basic_box_view<mbmff::box_type::av1C>::value() const noexcept -> mbmff::av1C_data
 {
     av1C_data result{};
     std::uint8_t read_byte = static_cast<std::uint8_t>(payload[0]);
@@ -70,14 +70,14 @@ constexpr auto basic_box_view<box_type::av1C>::value() const noexcept -> mbmff::
 
 #ifdef MBMFF_ENABLE_CONSTEXPR_TEST
 // validate must reject empty payload
-static_assert(!mbmff::basic_box_view<box_type::av1C>::validate(
-    {mbmff::box_header{}, std::span<const std::byte>{}}));
+static_assert(
+    !mbmff::basic_box_view<mbmff::box_type::av1C>::validate({mbmff::box_header{}, std::span<const std::byte>{}})
+);
 
 // validate must accept 4-byte payload
 static_assert([] {
     constexpr std::byte min_data[4]{};
-    auto r = mbmff::basic_box_view<box_type::av1C>::validate(
-        {mbmff::box_header{}, std::span(min_data)});
+    auto r = mbmff::basic_box_view<mbmff::box_type::av1C>::validate({mbmff::box_header{}, std::span(min_data)});
     return static_cast<bool>(r);
 }());
 #endif

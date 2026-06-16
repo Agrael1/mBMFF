@@ -49,9 +49,19 @@ def amalgamate(entry_point: str, search_dirs: list[str], version: str) -> str:
         inlined.add(norm)
 
         lines: list[str] = []
+        skip_until_endif = 0
         with open(filepath, "r", encoding="utf-8") as f:
             for line in f:
                 stripped = line.strip()
+
+                if stripped.startswith("#ifdef MBMFF_ENABLE_CONSTEXPR_TEST"):
+                    skip_until_endif += 1
+                    continue
+
+                if skip_until_endif:
+                    if stripped.startswith("#endif"):
+                        skip_until_endif -= 1
+                    continue
 
                 if stripped == "#pragma once":
                     continue

@@ -15,7 +15,7 @@ struct basic_box_view<mbmff::box_type::ispe> : public mbmff::box_view_base {
     constexpr auto value() const noexcept -> mbmff::ispe_data;
 };
 
-inline constexpr auto basic_box_view<box_type::ispe>::validate(mbmff::any_box_view box) noexcept
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::ispe>::validate(mbmff::any_box_view box) noexcept
     -> mbmff::result<mbmff::any_box_view>
 {
     if (box.payload.size() < 4) {
@@ -30,7 +30,7 @@ inline constexpr auto basic_box_view<box_type::ispe>::validate(mbmff::any_box_vi
     return {box};
 }
 
-inline constexpr auto basic_box_view<box_type::ispe>::value() const noexcept -> mbmff::ispe_data
+inline constexpr auto mbmff::basic_box_view<mbmff::box_type::ispe>::value() const noexcept -> mbmff::ispe_data
 {
     mbmff::ispe_data result{};
     result.image_width = mbmff::read_be<std::uint32_t>(payload);
