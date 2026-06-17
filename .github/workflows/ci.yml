@@ -1,29 +1,48 @@
 name: CI
 
 on:
+  push:
+    branches: [master]
   pull_request:
     branches: [master]
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -yq ninja-build
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
 
       - name: Configure
-        run: cmake -B build -G Ninja
+        run: cmake --preset ${{ runner.os == 'Windows' && 'x64-debug' || runner.os == 'macOS' && 'macos-debug' || 'linux-debug' }}
 
-      - name: Build (includes constexpr tests)
-        run: cmake --build build
+      - name: Build
+        run: cmake --build --preset ${{ runner.os == 'Windows' && 'x64-debug' || runner.os == 'macOS' && 'macos-debug' || 'linux-debug' }}
 
-      - name: Run tests on AVIF samples
-        run: |
-          for f in test/assets/*.avif; do
-            echo "=== $f ==="
-            ./build/test/mbmff-test "$f"
-          done
+      - name: Run string tests
+        run: >
+          out/build/${{ runner.os == 'Windows' && 'x64-debug' || runner.os == 'macOS' && 'macos-debug' || 'linux-debug' }}/test/mbmff-string-test${{ runner.os == 'Windows' && '.exe' || '' }}
+
+      - name: Run page test on sample HEIC
+        run: >
+          out/build/${{ runner.os == 'Windows' && 'x64-debug' || runner.os == 'macOS' && 'macos-debug' || 'linux-debug' }}/test/mbmff-test${{ runner.os == 'Windows' && '.exe' || '' }}
+          test/assets/sample.heic
+
+      - name: Run page test on sample AVIF
+        run: >
+          out/build/${{ runner.os == 'Windows' && 'x64-debug' || runner.os == 'macOS' && 'macos-debug' || 'linux-debug' }}/test/mbmff-test${{ runner.os == 'Windows' && '.exe' || '' }}
+          test/assets/avif_sample.avif

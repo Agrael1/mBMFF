@@ -56,14 +56,12 @@ install(EXPORT mbmffTargets
 )
 
 option(MBMFF_BUILD_TEST "Build tests" ${PROJECT_IS_TOP_LEVEL})
-if (MBMFF_BUILD_TEST)
-    add_subdirectory(test)
-endif()
 
 option(MBMFF_ENABLE_CONSTEXPR_TEST
     "Enable compile-time constexpr tests in headers"
     ${PROJECT_IS_TOP_LEVEL}
 )
-if (MBMFF_ENABLE_CONSTEXPR_TEST)
-    target_compile_definitions(mbmff INTERFACE MBMFF_ENABLE_CONSTEXPR_TEST)
+
+if (MBMFF_BUILD_TEST)
+    add_subdirectory(test)
 endif()
