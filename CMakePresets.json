@@ -26,8 +26,7 @@
                 "strategy": "external"
             },
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake"
+                "CMAKE_BUILD_TYPE": "Debug"
             }
         },
         {
@@ -35,8 +34,7 @@
             "displayName": "x64 Release",
             "inherits": "x64-debug",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake"
+                "CMAKE_BUILD_TYPE": "Release"
             }
         },
         {
@@ -48,8 +46,7 @@
                 "strategy": "external"
             },
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake"
+                "CMAKE_BUILD_TYPE": "Debug"
             }
         },
         {
@@ -57,8 +54,7 @@
             "displayName": "x86 Release",
             "inherits": "x86-debug",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "$env{VSINSTALLDIR}Common7/IDE/CommonExtensions/Microsoft/CMake/cmake/Microsoft/SegmentHeap.cmake"
+                "CMAKE_BUILD_TYPE": "Release"
             }
         },
         {
@@ -100,6 +96,57 @@
                     "sourceDir": "$env{HOME}/.vs/$ms{projectDirName}"
                 }
             }
+        },
+        {
+            "name": "clang-debug",
+            "displayName": "Clang Debug",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "installDir": "${sourceDir}/out/install/${presetName}",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "MBMFF_ENABLE_CONSTEXPR_TEST": "ON",
+                "MBMFF_TEST_CXX_STANDARD": "26"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "x64-debug",
+            "displayName": "x64 Debug",
+            "configurePreset": "x64-debug"
+        },
+        {
+            "name": "x64-release",
+            "displayName": "x64 Release",
+            "configurePreset": "x64-release"
+        },
+        {
+            "name": "x86-debug",
+            "displayName": "x86 Debug",
+            "configurePreset": "x86-debug"
+        },
+        {
+            "name": "x86-release",
+            "displayName": "x86 Release",
+            "configurePreset": "x86-release"
+        },
+        {
+            "name": "linux-debug",
+            "displayName": "Linux Debug",
+            "configurePreset": "linux-debug"
+        },
+        {
+            "name": "macos-debug",
+            "displayName": "macOS Debug",
+            "configurePreset": "macos-debug"
+        },
+        {
+            "name": "clang-debug",
+            "displayName": "Clang Debug",
+            "configurePreset": "clang-debug"
         }
     ]
 }

@@ -7,15 +7,27 @@
 #include <string_view>
 
 namespace mbmff {
+/// @brief enumeration describing the error condition
 enum class error_code {
-    success = 0,
+    /// @brief Operation succeeded.
+    success = 0, 
+
+    /// @brief Format of the box is invalid.
     invalid_format,
+
+    /// @brief The box is not loaded fully or at least the header is not fully readable.
     need_more_data,
+
+    /// @brief Special condition, where the box is not loaded fully,
+    /// but it is enough to continue recursive operation. 
     truncated,
 };
 
 //------------------------------------------------------------------------------------------------------------
-static constexpr auto to_string(mbmff::error_code code) noexcept -> std::string_view
+/// @brief Returns a human-readable string for an error code.
+/// @param[in] code error code
+/// @returns string representation of the error
+inline constexpr auto to_string(mbmff::error_code code) noexcept -> std::string_view
 {
     switch (code) {
     case mbmff::error_code::success:
@@ -30,45 +42,71 @@ static constexpr auto to_string(mbmff::error_code code) noexcept -> std::string_
         return "Unknown error code";
     }
 }
-//------------------------------------------------------------------------------------------------------------
+
+/// @brief Holds the result of a parsing operation: the parsed value and the number of bytes consumed.
+/// @tparam Type The type of the parsed value.
 template <typename Type>
 struct parsed {
+    /// @brief The parsed value.
     Type value;
+
+    /// @brief Number of bytes consumed from the input span to produce the value.
     std::size_t consumed = 0;
 };
 
+/// @brief Result type for operations that can succeed, fail, or partially succeed.
+/// @tparam Type The type of the result value on success.
+///
+/// Check success via `operator bool()` or compare `code` against `error_code::success`.
 template <typename Type>
 struct result {
+    /// @brief The result value. Valid only when `code == error_code::success`.
     Type value{};
+
+    /// @brief Error code. `error_code::success` means the operation succeeded.
     mbmff::error_code code = mbmff::error_code::success;
+
+    /// @brief For `error_code::need_more_data`: the minimum additional bytes required.
     std::size_t needed = 0;
 
 public:
+    /// @brief Returns `true` if the operation succeeded (`code == error_code::success`).
     constexpr explicit operator bool() const noexcept
     {
         return code == mbmff::error_code::success;
     }
+    /// @brief Accesses the result value via pointer.
     constexpr auto operator->() noexcept -> Type*
     {
         return &value;
     }
+    /// @brief Accesses the result value via reference.
     constexpr auto operator*() noexcept -> Type&
     {
         return value;
     }
+    /// @brief Accesses the result value via const reference.
     constexpr auto operator*() const noexcept -> const Type&
     {
         return value;
     }
 };
 
-// Error result — Type must be specified explicitly (e.g. make_result<any_box_view>(code, n))
+/// @brief Creates an error result. Type must be specified explicitly (e.g. `make_result<any_box_view>(code, n)`).
+/// @tparam Type The result value type.
+/// @param[in] code The error code.
+/// @param[in] needed Minimum additional bytes required (for `need_more_data`).
+/// @returns A result with the given error code.
 template <typename Type>
 constexpr auto make_result(mbmff::error_code code, std::size_t needed = 0) noexcept -> mbmff::result<Type>
 {
     return {{}, code, needed};
 }
 
+/// @brief Creates a success result from a value.
+/// @tparam Type The result value type (deduced from the argument).
+/// @param[in] value The success value.
+/// @returns A result with `error_code::success`.
 template <typename Type>
     requires(!std::same_as<Type, mbmff::error_code>)
 constexpr auto make_result(Type value) noexcept -> mbmff::result<Type>
@@ -76,6 +114,11 @@ constexpr auto make_result(Type value) noexcept -> mbmff::result<Type>
     return {value};
 }
 
+/// @brief Creates a result with an explicit value and error code (for truncated results).
+/// @tparam Type The result value type.
+/// @param[in] value The result value.
+/// @param[in] code The error code.
+/// @returns A result with the given value and error code.
 template <typename Type>
 constexpr auto make_result(Type value, mbmff::error_code code) noexcept -> mbmff::result<Type>
 {
@@ -83,7 +126,13 @@ constexpr auto make_result(Type value, mbmff::error_code code) noexcept -> mbmff
 }
 
 //------------------------------------------------------------------------------------------------------------
-
+/// @brief Converts a 4-character code to a uint32 fourcc value.
+///
+/// The input is read as little-endian bytes and stored in native uint32,
+/// so `fourcc("abcd")` yields `0x64636261`. Round-trips through
+/// `fourcc_string::from_uint32()`.
+/// @param[in] str A 4-character C-string (only the first 4 chars are used).
+/// @returns The fourcc as a uint32 value.
 constexpr auto fourcc(const char* str) noexcept -> std::uint32_t
 {
     return (static_cast<uint32_t>(static_cast<unsigned char>(str[3])) << 24)
@@ -92,10 +141,13 @@ constexpr auto fourcc(const char* str) noexcept -> std::uint32_t
          | static_cast<uint32_t>(static_cast<unsigned char>(str[0]));
 }
 
+/// @brief A 4-character code string, representing an ISOBMFF box type or similar identifier.
 struct fourcc_string {
+    /// @brief Raw 4-byte storage.
     std::array<char, 4> data_{};
 
 public:
+    /// @brief Returns the fourcc as a string view, trimmed at the first null byte.
     constexpr auto view() const noexcept -> std::string_view
     {
         auto len = std::size_t{0};
@@ -104,33 +156,42 @@ public:
         }
         return std::string_view(data_.data(), len);
     }
+    /// @brief Returns a const span over the 4 raw bytes.
     constexpr auto data() const noexcept -> const std::span<const char, 4>
     {
         return data_;
     }
+    /// @brief Returns a mutable span over the 4 raw bytes.
     constexpr auto data() noexcept -> std::span<char, 4>
     {
         return data_;
     }
+    /// @brief Converts the fourcc back to a uint32 value via `fourcc()`.
     constexpr auto to_uint32() const noexcept -> std::uint32_t
     {
         return mbmff::fourcc(data_.data());
     }
 
+    /// @brief Equality comparison.
     constexpr auto operator==(const mbmff::fourcc_string& other) const noexcept -> bool
     {
         return data_ == other.data_;
     }
+    /// @brief Accesses the i-th character of the fourcc.
     constexpr auto operator[](std::size_t index) const noexcept -> char
     {
         return data_[index];
     }
+    /// @brief Implicit conversion to string view.
     constexpr operator std::string_view() const noexcept
     {
         return view();
     }
 
 public:
+    /// @brief Constructs a fourcc from the first 4 bytes of a byte span.
+    /// @param[in] data Byte span (must have at least 4 bytes).
+    /// @returns A fourcc_string.
     constexpr static auto from_data(std::span<const std::byte> data) noexcept -> mbmff::fourcc_string
     {
         return mbmff::fourcc_string{std::array<char, 4>{
@@ -140,6 +201,9 @@ public:
             static_cast<char>(data[3]),
         }};
     }
+    /// @brief Constructs a fourcc from a uint32 (little-endian byte order).
+    /// @param[in] value uint32 fourcc value.
+    /// @returns A fourcc_string.
     constexpr static auto from_uint32(std::uint32_t value) noexcept -> mbmff::fourcc_string
     {
         return mbmff::fourcc_string{std::array<char, 4>{
@@ -149,6 +213,9 @@ public:
             static_cast<char>((value >> 24) & 0xFF),
         }};
     }
+    /// @brief Decodes an ISO-639-2 language code packed in 15 bits (per MP4 format) into a three-letter code + null.
+    /// @param[in] lang 16-bit language code as stored in the MP4 format.
+    /// @returns A fourcc_string with the decoded language (e.g. "eng", "jpn").
     constexpr static auto from_language(std::uint16_t lang) noexcept -> mbmff::fourcc_string
     {
         return mbmff::fourcc_string{std::array<char, 4>{
@@ -161,12 +228,20 @@ public:
 };
 
 //------------------------------------------------------------------------------------------------------------
+/// @brief Converts an enum value to its underlying integer type.
+/// @tparam Type The enum type.
+/// @param[in] value The enum value.
+/// @returns The underlying integer value.
 template <class Type>
 [[nodiscard]] constexpr auto to_underlying(Type value) noexcept -> std::underlying_type_t<Type>
 {
     return static_cast<std::underlying_type_t<Type>>(value);
 }
 
+/// @brief Reverses byte order of an integral value (supports 1, 2, 4, and 8 byte types).
+/// @tparam T The integral type.
+/// @param[in] value The value to byte-swap.
+/// @returns The byte-swapped value.
 template <std::integral T>
 constexpr auto byteswap(T value) noexcept -> T
 {
@@ -189,6 +264,10 @@ constexpr auto byteswap(T value) noexcept -> T
     }
 }
 
+/// @brief Reads an integral value from a byte span in big-endian order.
+/// @tparam T The integral type to read (1, 2, 4, or 8 bytes).
+/// @param[in] data Byte span (must have at least `sizeof(T)` bytes).
+/// @returns The big-endian decoded value.
 template <std::integral T>
 constexpr auto read_be(std::span<const std::byte> data) noexcept -> T
 {
@@ -205,18 +284,26 @@ constexpr auto read_be(std::span<const std::byte> data) noexcept -> T
 }
 
 //------------------------------------------------------------------------------------------------------------
+/// @brief The result of parsing a C-style string: the string value and the offset past the terminator.
 struct parsed_cstr {
+    /// @brief The parsed string (up to but not including the null terminator).
     std::string_view value{};
+
+    /// @brief The offset in the original data just past the null terminator.
     std::size_t next = 0;
 };
 
+/// @brief Reads a null-terminated (or length-limited) C string from `data` starting at `offset`.
+/// @param[in] data Byte span to read from.
+/// @param[in] offset Starting offset within `data`.
+/// @returns A `parsed_cstr` with the string and the offset past the null terminator.
 constexpr auto read_cstr(std::span<const std::byte> data, std::size_t offset) noexcept -> parsed_cstr
 {
     if (offset >= data.size()) {
         return {};
     }
 
-    const auto* begin = reinterpret_cast<const char*>(data.data() + offset);
+    const auto* begin = static_cast<const char*>(static_cast<const void*>(data.data() + offset));
     std::size_t length = 0;
     for (std::size_t i = offset; i < data.size(); ++i) {
         if (data[i] == std::byte{0}) {
