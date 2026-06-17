@@ -2,7 +2,7 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Agrael1/mBMFF/ci.yml?branch=master&label=CI&logo=github)](https://github.com/Agrael1/mBMFF/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/Agrael1/mBMFF)](LICENSE.txt)
-[![Version](https://img.shields.io/badge/version-0.1.1-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.1.2-blue)](VERSION)
 [![C++](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=cplusplus)](CMakeLists.txt)
 [![Header-only](https://img.shields.io/badge/header--only-yellowgreen)](include/mbmff)
 

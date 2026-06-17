@@ -47,7 +47,7 @@ static_assert(static_cast<bool>(mbmff::basic_box_view<mbmff::box_type::url>::val
     {mbmff::box_header{}, std::span<const std::byte>(std::array<std::byte, 4>{}.data(), 4)}
 )));
 
-// url with flag 0x000001 — no location string
+// url with flag 0x000001 - no location string
 static_assert([] {
     constexpr std::array<std::byte, 4> data{
         std::byte{0x00},
