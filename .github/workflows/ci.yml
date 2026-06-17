@@ -33,16 +33,6 @@ jobs:
       - name: Build
         run: cmake --build --preset ${{ runner.os == 'Windows' && 'x64-debug' || runner.os == 'macOS' && 'macos-debug' || 'linux-debug' }}
 
-      - name: Run string tests
-        run: >
-          out/build/${{ runner.os == 'Windows' && 'x64-debug' || runner.os == 'macOS' && 'macos-debug' || 'linux-debug' }}/test/mbmff-string-test${{ runner.os == 'Windows' && '.exe' || '' }}
-
-      - name: Run page test on sample HEIC
-        run: >
-          out/build/${{ runner.os == 'Windows' && 'x64-debug' || runner.os == 'macOS' && 'macos-debug' || 'linux-debug' }}/test/mbmff-test${{ runner.os == 'Windows' && '.exe' || '' }}
-          test/assets/sample.heic
-
-      - name: Run page test on sample AVIF
-        run: >
-          out/build/${{ runner.os == 'Windows' && 'x64-debug' || runner.os == 'macOS' && 'macos-debug' || 'linux-debug' }}/test/mbmff-test${{ runner.os == 'Windows' && '.exe' || '' }}
-          test/assets/avif_sample.avif
+      - name: Test
+        run: ctest --preset ${{ runner.os == 'Windows' && 'x64-debug' || runner.os == 'macOS' && 'macos-debug' || 'linux-debug' }} --output-on-failure
+        working-directory: ${{ github.workspace }}

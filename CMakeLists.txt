@@ -63,5 +63,6 @@ option(MBMFF_ENABLE_CONSTEXPR_TEST
 )
 
 if (MBMFF_BUILD_TEST)
+    enable_testing()
     add_subdirectory(test)
 endif()

@@ -275,9 +275,8 @@ public:
         if constexpr (mbmff::has(flags, mbmff::iterator_flags::recursive)) {
             auto properties = mbmff::get_box_properties(op_result->type_);
             if (mbmff::has(properties, mbmff::box_properties::container)) {
-                auto* payload_start = op_result->payload.data();
-                auto* payload_end = payload_start + op_result->payload.size();
-                remaining_ = std::span<const std::byte>(payload_start, payload_end);
+                auto offset = static_cast<std::size_t>(op_result->payload.data() - remaining_.data());
+                remaining_ = remaining_.subspan(offset);
                 return *this;
             }
         }

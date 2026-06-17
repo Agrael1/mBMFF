@@ -148,5 +148,42 @@
             "displayName": "Clang Debug",
             "configurePreset": "clang-debug"
         }
+    ],
+    "testPresets": [
+        {
+            "name": "x64-debug",
+            "displayName": "x64 Debug",
+            "configurePreset": "x64-debug"
+        },
+        {
+            "name": "x64-release",
+            "displayName": "x64 Release",
+            "configurePreset": "x64-release"
+        },
+        {
+            "name": "x86-debug",
+            "displayName": "x86 Debug",
+            "configurePreset": "x86-debug"
+        },
+        {
+            "name": "x86-release",
+            "displayName": "x86 Release",
+            "configurePreset": "x86-release"
+        },
+        {
+            "name": "linux-debug",
+            "displayName": "Linux Debug",
+            "configurePreset": "linux-debug"
+        },
+        {
+            "name": "macos-debug",
+            "displayName": "macOS Debug",
+            "configurePreset": "macos-debug"
+        },
+        {
+            "name": "clang-debug",
+            "displayName": "Clang Debug",
+            "configurePreset": "clang-debug"
+        }
     ]
 }
