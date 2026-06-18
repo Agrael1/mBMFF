@@ -11,7 +11,7 @@ template <>
 struct basic_box_view<mbmff::box_type::pixi> : public mbmff::box_view_base {
     constexpr static mbmff::box_properties properties = mbmff::box_properties::full_box;
     constexpr static auto validate(mbmff::any_box_view box) noexcept -> mbmff::result<mbmff::any_box_view>;
-    constexpr auto value() const noexcept -> mbmff::pixi_data;
+    auto value() const noexcept -> mbmff::pixi_data;
 };
 
 inline constexpr auto mbmff::basic_box_view<mbmff::box_type::pixi>::validate(mbmff::any_box_view box) noexcept
@@ -29,14 +29,14 @@ inline constexpr auto mbmff::basic_box_view<mbmff::box_type::pixi>::validate(mbm
     return {box};
 }
 
-inline constexpr auto mbmff::basic_box_view<mbmff::box_type::pixi>::value() const noexcept -> mbmff::pixi_data
+inline auto mbmff::basic_box_view<mbmff::box_type::pixi>::value() const noexcept -> mbmff::pixi_data
 {
     mbmff::pixi_data result{};
     auto num_channels = static_cast<std::uint8_t>(payload[0]);
     auto remaining = payload.size() - 1;
     auto count = (num_channels < remaining) ? num_channels : static_cast<std::uint8_t>(remaining);
     result.bits_per_channel = std::span<const std::uint8_t>(
-        static_cast<const std::uint8_t*>(static_cast<const void*>(payload.data() + 1)),
+        reinterpret_cast<const std::uint8_t*>(payload.data() + 1),
         count
     );
     return result;

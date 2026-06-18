@@ -7,10 +7,10 @@ struct infe_data {
     std::uint32_t item_id = 0;
     std::uint16_t item_protection_index = 0;
     mbmff::fourcc_string item_type{};
-    std::string_view item_name{};
-    std::string_view content_type{};
-    std::string_view content_encoding{};
-    std::string_view item_uri_type{};
+    mbmff::byte_view item_name{};
+    mbmff::byte_view content_type{};
+    mbmff::byte_view content_encoding{};
+    mbmff::byte_view item_uri_type{};
 };
 
 template <>
@@ -58,23 +58,18 @@ inline constexpr auto mbmff::basic_box_view<mbmff::box_type::infe>::value() cons
         offset += 4;
     }
 
-    auto name = mbmff::read_cstr(payload, offset);
-    result.item_name = name.value;
-    offset = name.next;
+    result.item_name = mbmff::byte_view::from_c_str(payload, offset);
+    offset += result.item_name.size() + 1;
 
     if (xversion >= 2) {
         if (result.item_type.view() == "mime") {
-            auto type = mbmff::read_cstr(payload, offset);
-            result.content_type = type.value;
-            offset = type.next;
-
-            auto encoding = mbmff::read_cstr(payload, offset);
-            result.content_encoding = encoding.value;
-            offset = encoding.next;
+            result.content_type = mbmff::byte_view::from_c_str(payload, offset);
+            offset += result.content_type.size() + 1;
+            result.content_encoding = mbmff::byte_view::from_c_str(payload, offset);
+            offset += result.content_encoding.size() + 1;
         } else if (result.item_type.view() == "uri ") {
-            auto uri = mbmff::read_cstr(payload, offset);
-            result.item_uri_type = uri.value;
-            offset = uri.next;
+            result.item_uri_type = mbmff::byte_view::from_c_str(payload, offset);
+            offset += result.item_uri_type.size() + 1;
         }
     }
 

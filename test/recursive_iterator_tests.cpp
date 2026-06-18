@@ -1,7 +1,7 @@
 #include <mbmff/mbmff.hpp>
+#include <array>
 #include <cstdio>
 #include <vector>
-#include <array>
 
 static int failed = 0;
 
@@ -63,8 +63,11 @@ static std::vector<std::byte> join(std::vector<std::vector<std::byte>> parts)
 // Helpers: run a recursive_box_iterator and check the type sequence
 // -----------------------------------------------------------------------
 
-static void check_seq(const char* name, std::span<const std::byte> data,
-                      std::initializer_list<mbmff::box_type> expected)
+static void check_seq(
+    const char* name,
+    std::span<const std::byte> data,
+    std::initializer_list<mbmff::box_type> expected
+)
 {
     auto it = mbmff::recursive_box_iterator(data);
     auto end = it.end();
@@ -75,15 +78,22 @@ static void check_seq(const char* name, std::span<const std::byte> data,
         }
         auto r = *it;
         if (!r) {
-            std::fprintf(stderr, "  parse error at expected %s\n",
-                mbmff::fourcc_string::from_uint32(mbmff::to_underlying(exp)).view().data());
+            std::fprintf(
+                stderr,
+                "  parse error at expected %s\n",
+                mbmff::fourcc_string::from_uint32(mbmff::to_underlying(exp)).view().data()
+            );
             TEST(name, false);
             return;
         }
         if (r->type_ != exp) {
-            std::fprintf(stderr, "  expected %s, got %.*s\n",
+            std::fprintf(
+                stderr,
+                "  expected %s, got %.*s\n",
                 mbmff::fourcc_string::from_uint32(mbmff::to_underlying(exp)).view().data(),
-                4, r->type_string().view().data());
+                4,
+                r->type_string().view().data()
+            );
             TEST(name, false);
             return;
         }
@@ -126,8 +136,11 @@ static void test_container_child_then_sibling()
     auto container = box("moov", child);
     auto sibling = box("mdat", {std::byte{2}});
     auto data = join({container, sibling});
-    check_seq("container_child_then_sibling", data,
-              {mbmff::box_type::moov, mbmff::box_type::mdat, mbmff::box_type::mdat});
+    check_seq(
+        "container_child_then_sibling",
+        data,
+        {mbmff::box_type::moov, mbmff::box_type::mdat, mbmff::box_type::mdat}
+    );
 }
 
 static void test_nested_containers()
@@ -135,8 +148,7 @@ static void test_nested_containers()
     auto leaf = box("mdat", {std::byte{0}});
     auto inner = box("trak", leaf);
     auto data = box("moov", inner);
-    check_seq("nested_containers", data,
-              {mbmff::box_type::moov, mbmff::box_type::trak, mbmff::box_type::mdat});
+    check_seq("nested_containers", data, {mbmff::box_type::moov, mbmff::box_type::trak, mbmff::box_type::mdat});
 }
 
 static void test_container_two_children_then_sibling()
@@ -146,8 +158,11 @@ static void test_container_two_children_then_sibling()
     auto container = box("moov", join({c1, c2}));
     auto sibling = box("mdat", {std::byte{3}});
     auto data = join({container, sibling});
-    check_seq("container_two_children_then_sibling", data,
-              {mbmff::box_type::moov, mbmff::box_type::mdat, mbmff::box_type::mdat, mbmff::box_type::mdat});
+    check_seq(
+        "container_two_children_then_sibling",
+        data,
+        {mbmff::box_type::moov, mbmff::box_type::mdat, mbmff::box_type::mdat, mbmff::box_type::mdat}
+    );
 }
 
 static void test_nested_with_siblings()
@@ -158,9 +173,15 @@ static void test_nested_with_siblings()
     auto mid = box("moov", join({inner, mid_child}));
     auto top_sibling = box("mdat", {std::byte{2}});
     auto data = join({mid, top_sibling});
-    check_seq("nested_with_siblings", data,
-              {mbmff::box_type::moov, mbmff::box_type::trak, mbmff::box_type::mdat,
-               mbmff::box_type::mdat, mbmff::box_type::mdat});
+    check_seq(
+        "nested_with_siblings",
+        data,
+        {mbmff::box_type::moov,
+         mbmff::box_type::trak,
+         mbmff::box_type::mdat,
+         mbmff::box_type::mdat,
+         mbmff::box_type::mdat}
+    );
 }
 
 // -----------------------------------------------------------------------

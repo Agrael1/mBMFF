@@ -6,7 +6,7 @@ namespace mbmff {
 struct schm_data {
     std::uint32_t scheme_type;
     std::uint32_t scheme_version;
-    std::string_view scheme_uri{};
+    mbmff::byte_view scheme_uri{};
 };
 
 template <>
@@ -38,10 +38,9 @@ inline constexpr auto mbmff::basic_box_view<mbmff::box_type::schm>::value() cons
     auto data = payload.subspan(4);
     auto scheme_type = mbmff::read_be<std::uint32_t>(data);
     auto scheme_version = mbmff::read_be<std::uint32_t>(data.subspan(4));
-    std::string_view scheme_uri{};
+    mbmff::byte_view scheme_uri{};
     if (flags() & 0x000001) {
-        auto uri = mbmff::read_cstr(payload, 12);
-        scheme_uri = uri.value;
+        scheme_uri = mbmff::byte_view::from_c_str(payload, 12);
     }
     return {scheme_type, scheme_version, scheme_uri};
 }
@@ -78,24 +77,21 @@ static_assert([] {
     return v.scheme_type == 1 && v.scheme_version == 2 && v.scheme_uri.empty();
 }());
 
-#    if __cpp_constexpr >= 202306L
-
 // schm with scheme_uri (flag 0x000001 set)
-//static_assert([] {
-//    constexpr std::array<std::byte, 19> data{
-//        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-//        std::byte{0x00}, std::byte{0x00}, std::byte{0x01}, std::byte{0x00}, std::byte{0x00},
-//        std::byte{0x00}, std::byte{0x02}, std::byte{'m'},  std::byte{'y'},  std::byte{'_'},
-//        std::byte{'u'},  std::byte{'r'},  std::byte{'i'},  std::byte{0x00},
-//    };
-//    mbmff::basic_box_view<mbmff::box_type::schm> schm_box;
-//    schm_box.version_ = 0;
-//    schm_box.flags_[2] = std::uint8_t{1};
-//    schm_box.payload = std::span(data);
-//    auto v = schm_box.value();
-//    return v.scheme_type == 1 && v.scheme_version == 2 && v.scheme_uri == "my_uri";
-//}());
-#    endif
+static_assert([] {
+    constexpr std::array<std::byte, 19> data{
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
+        std::byte{0x00}, std::byte{0x00}, std::byte{0x01}, std::byte{0x00}, std::byte{0x00},
+        std::byte{0x00}, std::byte{0x02}, std::byte{'m'},  std::byte{'y'},  std::byte{'_'},
+        std::byte{'u'},  std::byte{'r'},  std::byte{'i'},  std::byte{0x00},
+    };
+    mbmff::basic_box_view<mbmff::box_type::schm> schm_box;
+    schm_box.version_ = 0;
+    schm_box.flags_[2] = std::uint8_t{1};
+    schm_box.payload = std::span(data);
+    auto v = schm_box.value();
+    return v.scheme_type == 1 && v.scheme_version == 2 && v.scheme_uri == "my_uri";
+}());
 
 #endif
 

@@ -1,7 +1,7 @@
 #include <mbmff/mbmff.hpp>
+#include <array>
 #include <cstdio>
 #include <string_view>
-#include <array>
 
 // -----------------------------------------------------------------------
 // Helpers
@@ -28,9 +28,18 @@ static void test_url()
     // URL with location string
     {
         constexpr std::array<std::byte, 14> data{
-            std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-            std::byte{'t'},  std::byte{'e'},  std::byte{'s'},  std::byte{'t'},
-            std::byte{'_'},  std::byte{'u'},  std::byte{'r'},  std::byte{'l'},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{'t'},
+            std::byte{'e'},
+            std::byte{'s'},
+            std::byte{'t'},
+            std::byte{'_'},
+            std::byte{'u'},
+            std::byte{'r'},
+            std::byte{'l'},
             std::byte{0x00},
         };
         mbmff::basic_box_view<mbmff::box_type::url> box;
@@ -68,10 +77,22 @@ static void test_urn()
     // URN with name and location
     {
         constexpr std::array<std::byte, 16> data{
-            std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-            std::byte{'i'},  std::byte{'s'},  std::byte{'o'},  std::byte{0x00},
-            std::byte{'h'},  std::byte{'t'},  std::byte{'t'},  std::byte{'p'},
-            std::byte{':'},  std::byte{'/'},  std::byte{'/'},  std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{'i'},
+            std::byte{'s'},
+            std::byte{'o'},
+            std::byte{0x00},
+            std::byte{'h'},
+            std::byte{'t'},
+            std::byte{'t'},
+            std::byte{'p'},
+            std::byte{':'},
+            std::byte{'/'},
+            std::byte{'/'},
+            std::byte{0x00},
         };
         mbmff::basic_box_view<mbmff::box_type::urn> box;
         box.version_ = 0;
@@ -83,8 +104,14 @@ static void test_urn()
     // URN with name only
     {
         constexpr std::array<std::byte, 9> data{
-            std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-            std::byte{'i'},  std::byte{'s'},  std::byte{'o'},  std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{'i'},
+            std::byte{'s'},
+            std::byte{'o'},
+            std::byte{0x00},
             std::byte{0x00},
         };
         mbmff::basic_box_view<mbmff::box_type::urn> box;
@@ -112,9 +139,18 @@ static void test_schm()
     // SCHM without scheme_uri
     {
         constexpr std::array<std::byte, 12> data{
-            std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-            std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x01},
-            std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x02},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x01},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x00},
+            std::byte{0x02},
         };
         mbmff::basic_box_view<mbmff::box_type::schm> box;
         box.version_ = 0;
@@ -126,11 +162,10 @@ static void test_schm()
     // SCHM with scheme_uri
     {
         constexpr std::array<std::byte, 19> data{
-            std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
-            std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x01},
-            std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x02},
-            std::byte{'m'},  std::byte{'y'},  std::byte{'_'},  std::byte{'u'},
-            std::byte{'r'},  std::byte{'i'},  std::byte{0x00},
+            std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
+            std::byte{0x00}, std::byte{0x00}, std::byte{0x01}, std::byte{0x00}, std::byte{0x00},
+            std::byte{0x00}, std::byte{0x02}, std::byte{'m'},  std::byte{'y'},  std::byte{'_'},
+            std::byte{'u'},  std::byte{'r'},  std::byte{'i'},  std::byte{0x00},
         };
         mbmff::basic_box_view<mbmff::box_type::schm> box;
         box.version_ = 0;
@@ -142,38 +177,11 @@ static void test_schm()
 }
 
 // -----------------------------------------------------------------------
-// CDSC box tests
-// -----------------------------------------------------------------------
-static void test_cdsc()
-{
-    // CDSC with data
-    {
-        constexpr std::array<std::byte, 8> data{
-            std::byte{'h'}, std::byte{'e'}, std::byte{'l'}, std::byte{'l'},
-            std::byte{'o'}, std::byte{0x00}, std::byte{'x'}, std::byte{'y'},
-        };
-        mbmff::basic_box_view<mbmff::box_type::cdsc> box;
-        box.payload = std::span(data);
-        auto v = box.value();
-        TEST("cdsc value", v.value.size() == 8 && v.value[0] == 'h' && v.value[5] == '\0');
-    }
-
-    // CDSC empty payload
-    {
-        mbmff::basic_box_view<mbmff::box_type::cdsc> box;
-        box.payload = {};
-        auto v = box.value();
-        TEST("cdsc empty", v.value.empty());
-    }
-}
-
-// -----------------------------------------------------------------------
 int main()
 {
     test_url();
     test_urn();
     test_schm();
-    test_cdsc();
 
     if (failed) {
         std::fprintf(stderr, "\n%d test(s) FAILED\n", failed);

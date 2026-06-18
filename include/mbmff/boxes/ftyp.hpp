@@ -12,7 +12,7 @@ template <>
 struct basic_box_view<mbmff::box_type::ftyp> : public mbmff::box_view_base {
     constexpr static mbmff::box_properties properties = mbmff::box_properties::none;
     constexpr static auto validate(mbmff::any_box_view box) noexcept -> mbmff::result<mbmff::any_box_view>;
-    constexpr auto value() const noexcept -> mbmff::ftyp_data;
+    auto value() const noexcept -> mbmff::ftyp_data;
 };
 
 inline constexpr auto mbmff::basic_box_view<mbmff::box_type::ftyp>::validate(mbmff::any_box_view box) noexcept
@@ -29,7 +29,7 @@ inline constexpr auto mbmff::basic_box_view<mbmff::box_type::ftyp>::validate(mbm
     return {box};
 }
 
-constexpr auto mbmff::basic_box_view<mbmff::box_type::ftyp>::value() const noexcept -> mbmff::ftyp_data
+auto mbmff::basic_box_view<mbmff::box_type::ftyp>::value() const noexcept -> mbmff::ftyp_data
 {
     const auto compatible_data = payload.subspan(8);
     std::span<const mbmff::fourcc_string> compatible_brands(

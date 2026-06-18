@@ -5,7 +5,7 @@ namespace mbmff {
 
 struct hdlr_data {
     mbmff::fourcc_string handler_type{};
-    std::string_view name{};
+    mbmff::byte_view name{};
 };
 
 template <>
@@ -36,8 +36,7 @@ inline constexpr auto mbmff::basic_box_view<mbmff::box_type::hdlr>::value() cons
     result.handler_type = mbmff::fourcc_string::from_data(payload.subspan(4));
     auto name_span = payload.subspan(16);
     if (!name_span.empty()) {
-        auto name = mbmff::read_cstr(name_span, 0);
-        result.name = name.value;
+        result.name = mbmff::byte_view::from_c_str(name_span, 0);
     }
     return result;
 }

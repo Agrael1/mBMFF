@@ -97,7 +97,9 @@ inline constexpr auto mbmff::basic_box_view<mbmff::box_type::sgpd>::validate(mbm
             // fixed-length entries
             if (box.payload.size() < entries_offset + entry_count * default_length) {
                 return mbmff::make_result<mbmff::any_box_view>(
-                    mbmff::error_code::need_more_data, entries_offset + entry_count * default_length);
+                    mbmff::error_code::need_more_data,
+                    entries_offset + entry_count * default_length
+                );
             }
         }
     } else {
@@ -125,7 +127,13 @@ inline constexpr auto mbmff::basic_box_view<mbmff::box_type::sgpd>::value() cons
         header_size += 4;
     }
     auto entry_count = mbmff::read_be<std::uint32_t>(payload.subspan(header_size));
-    return {grouping_type, default_length, default_sample_description_index, entry_count, payload.subspan(header_size + 4)};
+    return {
+        grouping_type,
+        default_length,
+        default_sample_description_index,
+        entry_count,
+        payload.subspan(header_size + 4)
+    };
 }
 
 } // namespace mbmff

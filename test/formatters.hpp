@@ -210,14 +210,7 @@ struct std::formatter<mbmff::hev1_box> : std::formatter<std::string_view> {
             v.depth
         );
         if (!v.compressorname.empty()) {
-            auto len = static_cast<std::size_t>(v.compressorname[0]);
-            if (len > 31) {
-                len = 31;
-            }
-            std::string name(reinterpret_cast<const char*>(v.compressorname.data() + 1), len);
-            if (!name.empty()) {
-                out += std::format(" name=\"{}\"", name);
-            }
+            out += std::format(" name=\"{}\"", v.compressorname.string_view());
         }
         return std::formatter<std::string_view>::format(out, ctx);
     }
@@ -232,7 +225,7 @@ struct std::formatter<mbmff::hdlr_box> : std::formatter<std::string_view> {
         auto v = box.value();
         std::string out = std::format(" size=\"{}\" handler_type=\"{}\"", box.size_, v.handler_type.view());
         if (!v.name.empty()) {
-            out += std::format(" name=\"{}\"", v.name);
+            out += std::format(" name=\"{}\"", v.name.string_view());
         }
         return std::formatter<std::string_view>::format(out, ctx);
     }
@@ -332,19 +325,19 @@ struct std::formatter<mbmff::infe_box> : std::formatter<std::string_view> {
             v.item_protection_index
         );
         if (!v.item_name.empty()) {
-            out += std::format(" name=\"{}\"", v.item_name);
+            out += std::format(" name=\"{}\"", v.item_name.string_view());
         }
         if (v.item_type.view().size() == 4) {
             out += std::format(" type=\"{}\"", v.item_type.view());
         }
         if (!v.content_type.empty()) {
-            out += std::format(" content_type=\"{}\"", v.content_type);
+            out += std::format(" content_type=\"{}\"", v.content_type.string_view());
         }
         if (!v.content_encoding.empty()) {
-            out += std::format(" content_encoding=\"{}\"", v.content_encoding);
+            out += std::format(" content_encoding=\"{}\"", v.content_encoding.string_view());
         }
         if (!v.item_uri_type.empty()) {
-            out += std::format(" uri=\"{}\"", v.item_uri_type);
+            out += std::format(" uri=\"{}\"", v.item_uri_type.string_view());
         }
         return std::formatter<std::string_view>::format(out, ctx);
     }
@@ -383,14 +376,7 @@ struct std::formatter<mbmff::apcn_box> : std::formatter<std::string_view> {
             v.depth
         );
         if (!v.compressorname.empty()) {
-            auto len = static_cast<std::size_t>(v.compressorname[0]);
-            if (len > 31) {
-                len = 31;
-            }
-            std::string name(reinterpret_cast<const char*>(v.compressorname.data() + 1), len);
-            if (!name.empty()) {
-                out += std::format(" name=\"{}\"", name);
-            }
+            out += std::format(" name=\"{}\"", v.compressorname.string_view());
         }
         return std::formatter<std::string_view>::format(out, ctx);
     }
@@ -574,7 +560,7 @@ struct std::formatter<mbmff::url_box> : std::formatter<std::string_view> {
         auto v = box.value();
         auto out = std::format(" size=\"{}\" version=\"{}\"", box.size_, box.version());
         if (!v.location.empty()) {
-            out += std::format(" location=\"{}\"", v.location);
+            out += std::format(" location=\"{}\"", v.location.string_view());
         }
         return std::formatter<std::string_view>::format(out, ctx);
     }
@@ -623,14 +609,7 @@ struct std::formatter<mbmff::avc1_box> : std::formatter<std::string_view> {
             v.depth
         );
         if (!v.compressorname.empty()) {
-            auto len = static_cast<std::size_t>(v.compressorname[0]);
-            if (len > 31) {
-                len = 31;
-            }
-            std::string name(reinterpret_cast<const char*>(v.compressorname.data() + 1), len);
-            if (!name.empty()) {
-                out += std::format(" name=\"{}\"", name);
-            }
+            out += std::format(" name=\"{}\"", v.compressorname.string_view());
         }
         return std::formatter<std::string_view>::format(out, ctx);
     }
@@ -656,14 +635,7 @@ struct std::formatter<mbmff::mp4v_box> : std::formatter<std::string_view> {
             v.depth
         );
         if (!v.compressorname.empty()) {
-            auto len = static_cast<std::size_t>(v.compressorname[0]);
-            if (len > 31) {
-                len = 31;
-            }
-            std::string name(reinterpret_cast<const char*>(v.compressorname.data() + 1), len);
-            if (!name.empty()) {
-                out += std::format(" name=\"{}\"", name);
-            }
+            out += std::format(" name=\"{}\"", v.compressorname.string_view());
         }
         return std::formatter<std::string_view>::format(out, ctx);
     }
@@ -1030,8 +1002,13 @@ struct std::formatter<mbmff::btrt_box> : std::formatter<std::string_view> {
     {
         auto v = box.value();
         return std::formatter<std::string_view>::format(
-            std::format(" size=\"{}\" buffer_size=\"{}\" max_bitrate=\"{}\" avg_bitrate=\"{}\"",
-                        box.size_, v.buffer_size_db, v.max_bitrate, v.avg_bitrate),
+            std::format(
+                " size=\"{}\" buffer_size=\"{}\" max_bitrate=\"{}\" avg_bitrate=\"{}\"",
+                box.size_,
+                v.buffer_size_db,
+                v.max_bitrate,
+                v.avg_bitrate
+            ),
             ctx
         );
     }
@@ -1052,10 +1029,16 @@ struct std::formatter<mbmff::sbgp_box> : std::formatter<std::string_view> {
             entries += std::format(" [{}=\"{}\" idx=\"{}\"]", i, e.sample_count, e.group_description_index);
         }
         return std::formatter<std::string_view>::format(
-            std::format(" size=\"{}\" version=\"{}\" grouping_type=\"{}\""
-                        " grouping_type_parameter=\"{}\" entry_count=\"{}\"{}",
-                        box.size_, box.version(), type.view(),
-                        v.grouping_type_parameter, v.entry_count, entries),
+            std::format(
+                " size=\"{}\" version=\"{}\" grouping_type=\"{}\""
+                " grouping_type_parameter=\"{}\" entry_count=\"{}\"{}",
+                box.size_,
+                box.version(),
+                type.view(),
+                v.grouping_type_parameter,
+                v.entry_count,
+                entries
+            ),
             ctx
         );
     }
@@ -1080,12 +1063,18 @@ struct std::formatter<mbmff::sgpd_box> : std::formatter<std::string_view> {
             entries += std::format(" [{}={}]", i, hex);
         }
         return std::formatter<std::string_view>::format(
-            std::format(" size=\"{}\" version=\"{}\" grouping_type=\"{}\""
-                        " default_length=\"{}\""
-                        " default_sample_description_index=\"{}\" entry_count=\"{}\"{}",
-                        box.size_, box.version(), type.view(),
-                        v.default_length,
-                        v.default_sample_description_index, v.entry_count, entries),
+            std::format(
+                " size=\"{}\" version=\"{}\" grouping_type=\"{}\""
+                " default_length=\"{}\""
+                " default_sample_description_index=\"{}\" entry_count=\"{}\"{}",
+                box.size_,
+                box.version(),
+                type.view(),
+                v.default_length,
+                v.default_sample_description_index,
+                v.entry_count,
+                entries
+            ),
             ctx
         );
     }
@@ -1102,16 +1091,16 @@ struct std::formatter<mbmff::avc3_box> : std::formatter<std::string_view> {
             " size=\"{}\" width=\"{}\" height=\"{}\""
             " horizresolution=\"{:.2f}\" vertresolution=\"{:.2f}\""
             " frame_count=\"{}\" depth=\"{}\"",
-            box.size_, v.width, v.height,
+            box.size_,
+            v.width,
+            v.height,
             static_cast<double>(v.horizresolution) / 65536.0,
             static_cast<double>(v.vertresolution) / 65536.0,
-            v.frame_count, v.depth
+            v.frame_count,
+            v.depth
         );
         if (!v.compressorname.empty()) {
-            auto len = static_cast<std::size_t>(v.compressorname[0]);
-            if (len > 31) len = 31;
-            std::string name(reinterpret_cast<const char*>(v.compressorname.data() + 1), len);
-            if (!name.empty()) out += std::format(" name=\"{}\"", name);
+            out += std::format(" name=\"{}\"", v.compressorname.string_view());
         }
         return std::formatter<std::string_view>::format(out, ctx);
     }
@@ -1123,14 +1112,7 @@ template <>
 struct std::formatter<mbmff::cdsc_box> : std::formatter<std::string_view> {
     auto format(const mbmff::cdsc_box& box, std::format_context& ctx) const
     {
-        auto v = box.value();
-        auto out = std::format(" size=\"{}\"", box.size_);
-        if (!v.value.empty()) {
-            auto nul = v.value.find('\0');
-            auto s = (nul != std::string_view::npos) ? v.value.substr(0, nul) : v.value;
-            if (!s.empty()) out += std::format(" value=\"{}\"", s);
-        }
-        return std::formatter<std::string_view>::format(out, ctx);
+        return std::formatter<std::string_view>::format(std::format(" size=\"{}\"", box.size_), ctx);
     }
 };
 
@@ -1153,7 +1135,8 @@ struct std::formatter<mbmff::frma_box> : std::formatter<std::string_view> {
         auto v = box.value();
         auto fc = mbmff::fourcc_string::from_uint32(v.data_format);
         return std::formatter<std::string_view>::format(
-            std::format(" size=\"{}\" data_format=\"{}\"", box.size_, fc.view()), ctx
+            std::format(" size=\"{}\" data_format=\"{}\"", box.size_, fc.view()),
+            ctx
         );
     }
 };
@@ -1166,7 +1149,8 @@ struct std::formatter<mbmff::irot_box> : std::formatter<std::string_view> {
     {
         auto v = box.value();
         return std::formatter<std::string_view>::format(
-            std::format(" size=\"{}\" angle=\"{}\"", box.size_, v.angle), ctx
+            std::format(" size=\"{}\" angle=\"{}\"", box.size_, v.angle),
+            ctx
         );
     }
 };
@@ -1181,10 +1165,13 @@ struct std::formatter<mbmff::schm_box> : std::formatter<std::string_view> {
         auto fc = mbmff::fourcc_string::from_uint32(v.scheme_type);
         auto out = std::format(
             " size=\"{}\" version=\"{}\" scheme_type=\"{}\" scheme_version=\"{}\"",
-            box.size_, box.version(), fc.view(), v.scheme_version
+            box.size_,
+            box.version(),
+            fc.view(),
+            v.scheme_version
         );
         if (!v.scheme_uri.empty()) {
-            out += std::format(" scheme_uri=\"{}\"", v.scheme_uri);
+            out += std::format(" scheme_uri=\"{}\"", v.scheme_uri.string_view());
         }
         return std::formatter<std::string_view>::format(out, ctx);
     }
@@ -1208,8 +1195,12 @@ struct std::formatter<mbmff::urn_box> : std::formatter<std::string_view> {
     {
         auto v = box.value();
         auto out = std::format(" size=\"{}\"", box.size_);
-        if (!v.name.empty()) out += std::format(" name=\"{}\"", v.name);
-        if (!v.location.empty()) out += std::format(" location=\"{}\"", v.location);
+        if (!v.name.empty()) {
+            out += std::format(" name=\"{}\"", v.name.string_view());
+        }
+        if (!v.location.empty()) {
+            out += std::format(" location=\"{}\"", v.location.string_view());
+        }
         return std::formatter<std::string_view>::format(out, ctx);
     }
 };

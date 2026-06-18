@@ -32,7 +32,9 @@ inline constexpr auto mbmff::basic_box_view<mbmff::box_type::irot>::value() cons
 }
 
 #ifdef MBMFF_ENABLE_CONSTEXPR_TEST
-static_assert(!mbmff::basic_box_view<mbmff::box_type::irot>::validate({mbmff::box_header{}, std::span<const std::byte>{}}));
+static_assert(
+    !mbmff::basic_box_view<mbmff::box_type::irot>::validate({mbmff::box_header{}, std::span<const std::byte>{}})
+);
 
 static_assert(static_cast<bool>(mbmff::basic_box_view<mbmff::box_type::irot>::validate(
     {mbmff::box_header{}, std::span<const std::byte>(std::array<std::byte, 1>{}.data(), 1)}

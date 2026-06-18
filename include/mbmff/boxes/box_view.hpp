@@ -83,8 +83,8 @@
     MACRO(trak, "trak")                \
     MACRO(tref, "tref")                \
     MACRO(udta, "udta")                \
-    MACRO(urn,  "urn ")                \
-    MACRO(url,  "url ")                \
+    MACRO(urn, "urn ")                 \
+    MACRO(url, "url ")                 \
     MACRO(vmhd, "vmhd")                \
     MACRO(wide, "wide")
 

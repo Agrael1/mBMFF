@@ -4,7 +4,7 @@
 namespace mbmff {
 
 struct url_data {
-    std::string_view location{};
+    mbmff::byte_view location{};
 };
 
 template <>
@@ -30,8 +30,7 @@ inline constexpr auto mbmff::basic_box_view<mbmff::box_type::url>::value() const
     if ((flags() & 0x000001) || payload.empty()) {
         return {};
     }
-    auto location = mbmff::read_cstr(payload, 0);
-    return {location.value};
+    return {{mbmff::byte_view::from_c_str(payload, 0)}};
 }
 
 #ifdef MBMFF_ENABLE_CONSTEXPR_TEST

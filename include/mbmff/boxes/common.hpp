@@ -4,13 +4,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <span>
 #include <string_view>
 
 namespace mbmff {
 /// @brief enumeration describing the error condition
 enum class error_code {
     /// @brief Operation succeeded.
-    success = 0, 
+    success = 0,
 
     /// @brief Format of the box is invalid.
     invalid_format,
@@ -19,7 +20,7 @@ enum class error_code {
     need_more_data,
 
     /// @brief Special condition, where the box is not loaded fully,
-    /// but it is enough to continue recursive operation. 
+    /// but it is enough to continue recursive operation.
     truncated,
 };
 
@@ -284,41 +285,90 @@ constexpr auto read_be(std::span<const std::byte> data) noexcept -> T
 }
 
 //------------------------------------------------------------------------------------------------------------
-/// @brief The result of parsing a C-style string: the string value and the offset past the terminator.
-struct parsed_cstr {
-    /// @brief The parsed string (up to but not including the null terminator).
-    std::string_view value{};
+/// @brief A span of bytes with runtime-only string accessors.
+///        Aggregate-initializable from a std::span<const std::byte>.
+struct byte_view {
+    /// @brief The underlying byte span (public for aggregate init).
+    std::span<const std::byte> data_{};
 
-    /// @brief The offset in the original data just past the null terminator.
-    std::size_t next = 0;
-};
-
-/// @brief Reads a null-terminated (or length-limited) C string from `data` starting at `offset`.
-/// @param[in] data Byte span to read from.
-/// @param[in] offset Starting offset within `data`.
-/// @returns A `parsed_cstr` with the string and the offset past the null terminator.
-constexpr auto read_cstr(std::span<const std::byte> data, std::size_t offset) noexcept -> parsed_cstr
-{
-    if (offset >= data.size()) {
-        return {};
+    /// @brief Returns true if the span is empty.
+    constexpr auto empty() const noexcept -> bool
+    {
+        return data_.empty();
     }
-
-    const auto* begin = static_cast<const char*>(static_cast<const void*>(data.data() + offset));
-    std::size_t length = 0;
-    for (std::size_t i = offset; i < data.size(); ++i) {
-        if (data[i] == std::byte{0}) {
-            break;
+    /// @brief Returns the number of bytes.
+    constexpr auto size() const noexcept -> std::size_t
+    {
+        return data_.size();
+    }
+    /// @brief Returns a pointer to the first byte.
+    constexpr auto data() const noexcept -> const std::byte*
+    {
+        return data_.data();
+    }
+    /// @brief Accesses the i-th byte.
+    constexpr auto operator[](std::size_t i) const noexcept -> const std::byte&
+    {
+        return data_[i];
+    }
+    /// @brief Returns a subspan.
+    constexpr auto subspan(std::size_t offset, std::size_t count = std::dynamic_extent) const noexcept
+        -> std::span<const std::byte>
+    {
+        return data_.subspan(offset, count);
+    }
+    /// @brief Constexpr byte-wise comparison with a string view.
+    constexpr auto operator==(std::string_view sv) const noexcept -> bool
+    {
+        if (size() != sv.size()) {
+            return false;
         }
-        ++length;
+        for (std::size_t i = 0; i < size(); ++i) {
+            if (static_cast<char>(data_[i]) != sv[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+    /// @brief Extracts a C string from byte data starting at offset, bounded by the data size.
+    static constexpr auto from_c_str(std::span<const std::byte> data, std::size_t offset) noexcept -> byte_view
+    {
+        if (offset >= data.size()) {
+            return {};
+        }
+        std::size_t len = 0;
+        while (offset + len < data.size() && data[offset + len] != std::byte{0}) {
+            ++len;
+        }
+        return {data.subspan(offset, len)};
+    }
+    /// @brief Extracts the content portion of a Pascal string (length-prefixed, max 31 chars).
+    static constexpr auto from_pascal_str(byte_view bv) noexcept -> byte_view
+    {
+        if (bv.empty()) {
+            return {};
+        }
+        auto len = static_cast<std::size_t>(bv[0]);
+        if (len > 31) {
+            len = 31;
+        }
+        if (len + 1 > bv.size()) {
+            len = bv.size() - 1;
+        }
+        return {bv.subspan(1, len)};
     }
 
-    std::size_t next = offset + length;
-    if (next < data.size() && data[next] == std::byte{0}) {
-        ++next;
+    /// @brief Runtime-only: interprets the bytes as a string view.
+    auto string_view() const noexcept -> std::string_view
+    {
+        return {reinterpret_cast<const char*>(data_.data()), data_.size()};
     }
 
-    return {std::string_view(begin, length), next};
-}
+    auto view() const noexcept -> std::string_view
+    {
+        return string_view();
+    }
+};
 
 } // namespace mbmff
 
@@ -336,6 +386,25 @@ static_assert(
         return str[0] == d[0] && str[1] == d[1] && str[2] == d[2] && str[3] == d[3];
     }(),
     "fourcc_string::from_uint32(0x64636261) should return 'abcd'"
+);
+
+// byte_view tests
+static_assert(mbmff::byte_view{}.empty(), "default byte_view should be empty");
+static_assert(mbmff::byte_view{}.size() == 0, "default byte_view size should be 0");
+static_assert(
+    []() {
+        constexpr auto bv = mbmff::byte_view{std::span<const std::byte>()};
+        return bv.empty();
+    }(),
+    "byte_view from empty span should be empty"
+);
+static_assert(
+    []() {
+        constexpr std::array<std::byte, 3> arr{std::byte{'h'}, std::byte{'o'}, std::byte{'i'}};
+        auto bv = mbmff::byte_view::from_c_str(arr, 0);
+        return bv == "hoi";
+    }(),
+    "byte_view from span should have correct size and contents"
 );
 
 // byteswap tests

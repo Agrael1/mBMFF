@@ -10,7 +10,7 @@ struct hev1_data {
     std::uint32_t horizresolution;
     std::uint32_t vertresolution;
     std::uint16_t frame_count;
-    std::span<const std::byte> compressorname;
+    mbmff::byte_view compressorname{};
     std::uint16_t depth;
 };
 
@@ -44,7 +44,7 @@ inline constexpr auto mbmff::basic_box_view<mbmff::box_type::hev1>::value() cons
         mbmff::read_be<std::uint32_t>(span.subspan(28)),
         mbmff::read_be<std::uint32_t>(span.subspan(32)),
         mbmff::read_be<std::uint16_t>(span.subspan(40)),
-        span.subspan(42, 32),
+        mbmff::byte_view::from_pascal_str({span.subspan(42, 32)}),
         mbmff::read_be<std::uint16_t>(span.subspan(74)),
     };
 }

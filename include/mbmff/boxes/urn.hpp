@@ -4,8 +4,8 @@
 namespace mbmff {
 
 struct urn_data {
-    std::string_view name{};
-    std::string_view location{};
+    mbmff::byte_view name{};
+    mbmff::byte_view location{};
 };
 
 template <>
@@ -29,10 +29,10 @@ inline constexpr auto mbmff::basic_box_view<mbmff::box_type::urn>::validate(mbmf
 inline constexpr auto mbmff::basic_box_view<mbmff::box_type::urn>::value() const noexcept -> mbmff::urn_data
 {
     std::size_t offset = 0;
-    auto name = mbmff::read_cstr(payload, offset);
-    offset = name.next;
-    auto location = mbmff::read_cstr(payload, offset);
-    return {name.value, location.value};
+    auto name = mbmff::byte_view::from_c_str(payload, offset);
+    offset += name.size() + 1;
+    auto location = mbmff::byte_view::from_c_str(payload, offset);
+    return {name, location};
 }
 
 #ifdef MBMFF_ENABLE_CONSTEXPR_TEST
